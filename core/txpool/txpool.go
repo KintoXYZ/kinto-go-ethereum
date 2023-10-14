@@ -601,14 +601,10 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 func (pool *TxPool) validateTxBasics(tx *types.Transaction, local bool) error {
 
 	// Building addresses from .env, at a later stage we prob should hardcode.
-	aaEntryPointEnv := os.Getenv("AA_ENTRY_POINT")
-	aaEntryPointEnvAddress := common.HexToAddress(aaEntryPointEnv)
-	kintoIdEnv := os.Getenv("KINTO_ID_PROXY")
-	kintoIdEnvAddress := common.HexToAddress(kintoIdEnv)
-	walletFactoryEnv := os.Getenv("WALLET_FACTORY")
-	walletFactoryAddress := common.HexToAddress(walletFactoryEnv)
-	paymasterEnv := os.Getenv("PAY_MASTER")
-	paymasterAddress := common.HexToAddress(paymasterEnv)
+	aaEntryPointEnvAddress := common.HexToAddress(os.Getenv("AA_ENTRY_POINT"))
+	kintoIdEnvAddress := common.HexToAddress(os.Getenv("KINTO_ID_PROXY"))
+	walletFactoryAddress := common.HexToAddress(os.Getenv("WALLET_FACTORY"))
+	paymasterAddress := common.HexToAddress(os.Getenv("PAY_MASTER"))
 
 	//First 1000 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(1000))
