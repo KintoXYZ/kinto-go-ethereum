@@ -100,4 +100,7 @@ var (
 
 	// ErrSenderNoEOA is returned if the sender of a transaction is a contract.
 	ErrSenderNoEOA = errors.New("sender not an eoa")
+
+	// ErrKintoNotAllowed
+	ErrKintoNotAllowed = errors.New("Kinto does not allow EOAs or txs that not target our known contracts")
 )

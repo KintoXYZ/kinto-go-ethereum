@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -598,6 +599,33 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 // This check is meant as an early check which only needs to be performed once,
 // and does not require the pool mutex to be held.
 func (pool *TxPool) validateTxBasics(tx *types.Transaction, local bool) error {
+
+	// Building addresses from .env, at a later stage we prob should hardcode.
+	aaEntryPointEnv := os.Getenv("AA_ENTRY_POINT")
+	aaEntryPointEnvAddress := common.HexToAddress(aaEntryPointEnv)
+	kintoIdEnv := os.Getenv("KINTO_ID_PROXY")
+	kintoIdEnvAddress := common.HexToAddress(kintoIdEnv)
+	walletFactoryEnv := os.Getenv("WALLET_FACTORY")
+	walletFactoryAddress := common.HexToAddress(walletFactoryEnv)
+	paymasterEnv := os.Getenv("PAY_MASTER")
+	paymasterAddress := common.HexToAddress(paymasterEnv)
+
+	//First 1000 blocks allow us to deploy required contracts can be modified later
+	KINTO_RULES_BLOCK_START := big.NewInt(int64(1000))
+	currentBlockNumber := pool.chain.CurrentBlock().Number
+	destination := tx.To()
+
+	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 {
+		if destination == nil {
+			return ErrInvalidSender
+		} else if !(*destination == aaEntryPointEnvAddress ||
+			*destination == kintoIdEnvAddress ||
+			*destination == walletFactoryAddress ||
+			*destination == paymasterAddress) {
+			return ErrInvalidSender
+		}
+	}
+
 	// Accept only legacy transactions until EIP-2718/2930 activates.
 	if !pool.eip2718.Load() && tx.Type() != types.LegacyTxType {
 		return core.ErrTxTypeNotSupported

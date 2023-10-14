@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
@@ -405,6 +406,35 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Check clause 6
 	if msg.Value.Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From, msg.Value) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From.Hex())
+	}
+
+	// Check clause 7 - KINTO L2
+
+	// Building addresses from .env, at a later stage we prob should hardcode.
+	aaEntryPointEnv := os.Getenv("AA_ENTRY_POINT")
+	aaEntryPointEnvAddress := common.HexToAddress(aaEntryPointEnv)
+	kintoIdEnv := os.Getenv("KINTO_ID_PROXY")
+	kintoIdEnvAddress := common.HexToAddress(kintoIdEnv)
+	walletFactoryEnv := os.Getenv("WALLET_FACTORY")
+	walletFactoryAddress := common.HexToAddress(walletFactoryEnv)
+	paymasterEnv := os.Getenv("PAY_MASTER")
+	paymasterAddress := common.HexToAddress(paymasterEnv)
+
+	//First 1000 blocks allow us to deploy required contracts can be modified later
+	KINTO_RULES_BLOCK_START := big.NewInt(int64(1000))
+
+	destination := msg.To
+	currentBlockNumber := st.evm.Context.BlockNumber
+
+	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 {
+		if destination == nil {
+			return nil, fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+		} else if !(*destination == aaEntryPointEnvAddress ||
+			*destination == kintoIdEnvAddress ||
+			*destination == walletFactoryAddress ||
+			*destination == paymasterAddress) {
+			return nil, fmt.Errorf("%w: %v is trying to tx against an invalid address, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+		}
 	}
 
 	// Check whether the init code size has been exceeded.
