@@ -2580,3 +2580,79 @@ func BenchmarkMultiAccountBatchInsert(b *testing.B) {
 		pool.AddRemotesSync([]*types.Transaction{tx})
 	}
 }
+
+func TestValidateTxBasics(t *testing.T) {
+	os.Setenv("AA_ENTRY_POINT", "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1")
+	os.Setenv("KINTO_ID_PROXY", "0x9561C133DD8580860B6b7E504bC5Aa500f0f06a7")
+	os.Setenv("WALLET_FACTORY", "0x1234567890abcdef1234567890abcdef12345678")
+	os.Setenv("PAY_MASTER", "0xabcdef1234567890abcdef1234567890abcdef12")
+	t.Parallel()
+
+	pool, key := setupPool()
+	defer pool.Stop()
+
+	authorizedAddress := common.HexToAddress("0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1")
+	unauthorizedAddress := common.HexToAddress("0xDeadBeefDeadBeefDeadBeefDeadBeefDeadBeef")
+
+	testCases := []struct {
+		desc          string
+		blockNumber   *big.Int
+		to            *common.Address
+		expectedError error
+	}{
+		{"Block < 1000, contract creation", big.NewInt(999), nil, nil},
+		{"Block > 1000, contract creation", big.NewInt(1001), nil, ErrInvalidSender},
+		{"Block > 1000, unauthorized address", big.NewInt(1001), &unauthorizedAddress, ErrInvalidSender},
+		{"Block > 1000, authorized address", big.NewInt(1001), &authorizedAddress, nil},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			pool.chain = &mockBlockchain{number: tc.blockNumber, gasLimit: 10000000}
+
+			var to common.Address
+			if tc.to != nil {
+				to = *tc.to
+			}
+
+			tx := pricedTransaction(1, 21000, big.NewInt(2), key)
+			if tc.to != nil {
+				tx = types.NewTransaction(tx.Nonce(), to, tx.Value(), tx.Gas(), tx.GasPrice(), tx.Data())
+				tx, _ = types.SignTx(tx, types.NewEIP155Signer(big.NewInt(1)), key)
+			}
+
+			err := pool.validateTxBasics(tx, true)
+
+			if !errors.Is(err, tc.expectedError) {
+				t.Errorf("expected error %v, but got %v", tc.expectedError, err)
+			}
+		})
+	}
+}
+
+type mockSubscription struct{}
+
+func (ms *mockSubscription) Unsubscribe() {}
+func (ms *mockSubscription) Err() <-chan error {
+	return nil
+} // A mock blockchain to return the desired current block number for testing
+type mockBlockchain struct {
+	number   *big.Int
+	gasLimit uint64
+}
+
+func (m *mockBlockchain) CurrentBlock() *types.Header {
+	return &types.Header{Number: m.number}
+}
+
+func (m *mockBlockchain) GetBlock(hash common.Hash, number uint64) *types.Block {
+	return nil
+}
+
+func (m *mockBlockchain) StateAt(root common.Hash) (*state.StateDB, error) {
+	return nil, nil
+}
+
+func (m *mockBlockchain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return &mockSubscription{}
+}
