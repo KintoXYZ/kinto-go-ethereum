@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
@@ -411,10 +410,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Check clause 7 - KINTO L2
 
 	// Building addresses from .env, at a later stage we prob should hardcode.
-	aaEntryPointEnvAddress := common.HexToAddress(os.Getenv("AA_ENTRY_POINT"))
-	kintoIdEnvAddress := common.HexToAddress(os.Getenv("KINTO_ID_PROXY"))
-	walletFactoryAddress := common.HexToAddress(os.Getenv("WALLET_FACTORY"))
-	paymasterAddress := common.HexToAddress(os.Getenv("PAY_MASTER"))
+	aaEntryPointEnvAddress := common.HexToAddress("0xfCe5B1d3c420D00DDF79C65189889aF3DD8e754f")
+	kintoIdEnvAddress := common.HexToAddress("0x8C63bBFec464133DA596084A4F16EA3081970dcB")
+	walletFactoryAddress := common.HexToAddress("0x4847bD5DC38194185579E3aE627140462D46Df00")
+	paymasterAddress := common.HexToAddress("0x199fa5B707aC410DC43035e20447E17D027684ef")
 
 	//First 1000 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(1000))
