@@ -421,7 +421,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	destination := msg.To
 	currentBlockNumber := st.evm.Context.BlockNumber
 
-	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 {
+	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 && msg.TxRunMode != MessageEthcallMode {
 		if destination == nil {
 			return nil, fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 		} else if !(*destination == aaEntryPointEnvAddress ||
