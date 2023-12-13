@@ -411,9 +411,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Building addresses from .env, at a later stage we prob should hardcode.
 	aaEntryPointEnvAddress := common.HexToAddress("0xfCe5B1d3c420D00DDF79C65189889aF3DD8e754f")
-	kintoIdEnvAddress := common.HexToAddress("0x8C63bBFec464133DA596084A4F16EA3081970dcB")
-	walletFactoryAddress := common.HexToAddress("0x6084DCe4587F49Ad5b5bfDc43531b86690fEdD38")
-	paymasterAddress := common.HexToAddress("0x3B760a9216E4adcA51dA7EB8b7B0F6D62288f9e6")
+	kintoIdEnvAddress := common.HexToAddress("0x59a7a8d6b081046E0D90C36D714250A2AA2799b0")
+	walletFactoryAddress := common.HexToAddress("0x3A04db5Eaa8Dc58c2c141349D8bD3fe53bF87A2C")
+	paymasterAddress := common.HexToAddress("0x199fa5B707aC410DC43035e20447E17D027684ef")
 
 	//First 1000 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(100))
