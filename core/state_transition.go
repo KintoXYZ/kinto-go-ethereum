@@ -410,12 +410,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Check clause 7 - KINTO L2
 
 	// Building addresses from .env, at a later stage we prob should hardcode.
-	aaEntryPointEnvAddress := common.HexToAddress("0xfCe5B1d3c420D00DDF79C65189889aF3DD8e754f")
-	kintoIdEnvAddress := common.HexToAddress("0x59a7a8d6b081046E0D90C36D714250A2AA2799b0")
-	walletFactoryAddress := common.HexToAddress("0x3A04db5Eaa8Dc58c2c141349D8bD3fe53bF87A2C")
-	paymasterAddress := common.HexToAddress("0x199fa5B707aC410DC43035e20447E17D027684ef")
+	aaEntryPointEnvAddress := common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
+	kintoIdEnvAddress := common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
+	walletFactoryAddress := common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
+	paymasterAddress := common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 
-	//First 1000 blocks allow us to deploy required contracts can be modified later
+	//First 100 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(100))
 
 	destination := msg.To
