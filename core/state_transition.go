@@ -412,10 +412,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Check clause 7 - KINTO L2
 
 	//Hardcoded addresses
-	aaEntryPointEnvAddress := common.HexToAddress("0xfCe5B1d3c420D00DDF79C65189889aF3DD8e754f")
-	kintoIdEnvAddress := common.HexToAddress("0x8C63bBFec464133DA596084A4F16EA3081970dcB")
-	walletFactoryAddress := common.HexToAddress("0x6084DCe4587F49Ad5b5bfDc43531b86690fEdD38")
-	paymasterAddress := common.HexToAddress("0x3B760a9216E4adcA51dA7EB8b7B0F6D62288f9e6")
+	aaEntryPointEnvAddress := common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
+	kintoIdEnvAddress := common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
+	walletFactoryAddress := common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
+	paymasterAddress := common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 
 	//Hardcoded function selectors for EntryPoint
 	functionSelectorEPWithdrawTo := "0x205c2878" //   "withdrawTo(address,uint256)": "205c2878"
