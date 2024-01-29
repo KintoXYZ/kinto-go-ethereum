@@ -418,14 +418,14 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	paymasterAddress := common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 
 	//Hardcoded function selectors for EntryPoint
-	functionSelectorEPWithdrawTo := "0x205c2878" //   "withdrawTo(address,uint256)": "205c2878"
-	functionSelectorEPWithdrawStake := "0xc23a5cea" //   "withdrawStake(address)": "c23a5cea",
-	functionSelectorEPHandleOps := "0x1fad948c"//  "handleOps((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address)": "1fad948c",
-	functionSelectorEPHandleAggregatedOps := "0x4b1d7cf5"//  "handleAggregatedOps(((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address,bytes)[],address)": "4b1d7cf5",
+	functionSelectorEPWithdrawTo := "205c2878" //   "withdrawTo(address,uint256)": "205c2878"
+	functionSelectorEPWithdrawStake := "c23a5cea" //   "withdrawStake(address)": "c23a5cea",
+	functionSelectorEPHandleOps := "1fad948c"//  "handleOps((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address)": "1fad948c",
+	functionSelectorEPHandleAggregatedOps := "4b1d7cf5"//  "handleAggregatedOps(((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address,bytes)[],address)": "4b1d7cf5",
 
 	//Hardcoded function selectors for Sponsorpaymaster
-	functionSelectorSPWithdrawTo := "0x205c2878" // "withdrawTo(address,uint256)": "205c2878"
-	functionSelectorSPDeposit := "0xd0e30db0"//  "deposit()": "d0e30db0",
+	functionSelectorSPWithdrawTo := "205c2878" // "withdrawTo(address,uint256)": "205c2878"
+	functionSelectorSPDeposit := "d0e30db0"//  "deposit()": "d0e30db0",
 
 	functionSelector := hex.EncodeToString(msg.Data[:4])
 
