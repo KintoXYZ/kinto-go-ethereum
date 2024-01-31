@@ -427,7 +427,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	functionSelectorSPWithdrawTo := "205c2878" // "withdrawTo(address,uint256)": "205c2878"
 	functionSelectorSPDeposit := "d0e30db0"//  "deposit()": "d0e30db0",
 
-	functionSelector := hex.EncodeToString(msg.Data[:4])
+	functionSelector := ""
+	if len(msg.Data) >= 4 {
+    functionSelector = hex.EncodeToString(msg.Data[:4])
+	}
 
 	//First 1000 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(100))
