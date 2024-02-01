@@ -27,6 +27,7 @@ import (
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -412,10 +413,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Check clause 7 - KINTO L2
 
 	//Hardcoded addresses
-	aaEntryPointEnvAddress := common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
-	kintoIdEnvAddress := common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
-	walletFactoryAddress := common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
-	paymasterAddress := common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
+	aaEntryPointEnvAddress := common.HexToAddress("0x351110fC667dA12B5d07AEDaE6e90f17BAF512C0")
+	kintoIdEnvAddress := common.HexToAddress("0xD5e0E7342Ad607516e177fDC9133E38e1a57679A")
+	walletFactoryAddress := common.HexToAddress("0xDed93a06edd053538c8F6b9A5ee07a45Fc590Fa4")
+	paymasterAddress := common.HexToAddress("0x77d878C48d13e11F0932616a0c43306cf17A2e25")
 
 	//Hardcoded function selectors for EntryPoint
 	functionSelectorEPWithdrawTo := "205c2878" //   "withdrawTo(address,uint256)": "205c2878"
@@ -431,6 +432,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if len(msg.Data) >= 4 {
     functionSelector = hex.EncodeToString(msg.Data[:4])
 	}
+
+	log.Warn("******FUNCTION SELECTOR", "functionSelector", functionSelector)
+
 
 	//First 1000 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(100))
@@ -454,6 +458,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			addressBytes := encodedAddress[12:] //The actual address is the last 20 bytes of this 32-qbyte block
 
 			paramAddress := common.HexToAddress("0x" + hex.EncodeToString(addressBytes)) // Convert to a hex string and add the '0x' prefix
+			log.Warn("******msg.From", "msg.From", msg.From)
+			log.Warn("******paramAddress", "paramAddress", paramAddress)
 
 			if(msg.From != paramAddress) {
 				return nil, fmt.Errorf("%w: %v is trying to withdraw/withdrawStake from EntryPoint to a param different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
@@ -468,6 +474,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
         	// Convert the extracted bytes to an Ethereum address
         	beneficiaryAddress := common.HexToAddress("0x" + hex.EncodeToString(addressBytes))
+					log.Warn("******msg.From", "msg.From", msg.From)
+					log.Warn("******beneficiaryAddress", "beneficiaryAddress", beneficiaryAddress)
 
 					if(msg.From != beneficiaryAddress) {
 						return nil, fmt.Errorf("%w: %v is trying to handleOps/handleAggregatedOps from EntryPoint to a beneficiary different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
