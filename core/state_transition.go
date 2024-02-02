@@ -453,16 +453,24 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		} else if *destination == aaEntryPointEnvAddress && 
 			(functionSelector == functionSelectorEPWithdrawTo || 
 			 functionSelector == functionSelectorEPWithdrawStake) {
-			// Extract the next 32 bytes which contain the address
-			encodedAddress := msg.Data[4:36] // 4 bytes of function selector + 32 bytes for address
-			addressBytes := encodedAddress[12:] //The actual address is the last 20 bytes of this 32-qbyte block
+			
+			// the offset for the dynamic array (user ops) is the first 32 bytes after the function selector and the beneficiary comes after
+			data := msg.Data[4:] // remove function selector
+			if len(data) >= 32 { // ensure there's enough data
+				offset := 32                // 32 bytes
+				if len(data) >= offset+32 { // ensure there's enough data
+					beneficiaryEncoded := data[offset : offset+32] // starting from the offset (32 bytes), extract the next 32 bytes
+					beneficiaryBytes := beneficiaryEncoded[12:]    // get the last 20 bytes of the 32-byte block which is the address
 
-			paramAddress := common.HexToAddress("0x" + hex.EncodeToString(addressBytes)) // Convert to a hex string and add the '0x' prefix
-			log.Warn("******msg.From", "msg.From", msg.From)
-			log.Warn("******paramAddress", "paramAddress", paramAddress)
+					// Convert the extracted bytes to an Ethereum address
+					beneficiaryAddress := common.HexToAddress("0x" + hex.EncodeToString(beneficiaryBytes))
+					log.Warn("******msg.From", "msg.From", msg.From)
+					log.Warn("******beneficiaryAddress", "beneficiaryAddress", beneficiaryAddress)
 
-			if(msg.From != paramAddress) {
-				return nil, fmt.Errorf("%w: %v is trying to withdraw/withdrawStake from EntryPoint to a param different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+					if msg.From != beneficiaryAddress {
+						return nil, fmt.Errorf("%w: %v is trying to handleOps/handleAggregatedOps from EntryPoint to a beneficiary different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), beneficiaryAddress)
+					}
+				}
 			}
 		} else if *destination == aaEntryPointEnvAddress &&
 			(functionSelector == functionSelectorEPHandleOps ||
