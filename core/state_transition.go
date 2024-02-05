@@ -417,6 +417,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	kintoIdEnvAddress := common.HexToAddress("0xa812c34cB952039934B6e0b86E91F628ce0092aa")
 	walletFactoryAddress := common.HexToAddress("0x2fdECA9826f3dA40E7ebe463Bd0BC8CE5a274752")
 	paymasterAddress := common.HexToAddress("0x6ecDCd6C797Cb1D358eB436935095d0b04949fb9")
+	appRegistry := common.HexToAddress("0x79609fCE4791C3f0067aDEc72DcDB1a89cCbf58F")
 
 	//Hardcoded function selectors for EntryPoint
 	functionSelectorEPWithdrawTo := "205c2878"          //   "withdrawTo(address,uint256)": "205c2878"
@@ -443,7 +444,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	destination := msg.To
 	currentBlockNumber := st.evm.Context.BlockNumber
 
-	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 && msg.TxRunMode != MessageEthcallMode { //ORIGINAL KINTO RULES
+	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 && currentBlockNumber.Cmp(KINTO_HARDFORK_1) <= 0 && msg.TxRunMode != MessageEthcallMode { //ORIGINAL KINTO RULES
+		log.Warn("****** KINTO ORIGINAL RULES ******")
+
 		if destination == nil {
 			return nil, fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 		} else if !(*destination == aaEntryPointEnvAddress ||
@@ -454,11 +457,20 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		}
 	}
 
-	if currentBlockNumber.Cmp(KINTO_HARDFORK_1) > 0 { //HARDFORK #1 RULES
-		//EntryPoint withdrawal rules
-		if *destination == aaEntryPointEnvAddress &&
+	if currentBlockNumber.Cmp(KINTO_HARDFORK_1) > 0 && msg.TxRunMode != MessageEthcallMode { //HARDFORK #1 RULES
+		log.Warn("****** KINTO HARDFORK #1 RULES ******")
+
+		if destination == nil {
+			return nil, fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+		} else if !(*destination == aaEntryPointEnvAddress ||
+			*destination == kintoIdEnvAddress ||
+			*destination == walletFactoryAddress ||
+			*destination == paymasterAddress ||
+			*destination == appRegistry) {
+			return nil, fmt.Errorf("%w: %v is trying to tx against an invalid address, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+		} else if *destination == aaEntryPointEnvAddress &&
 			(functionSelector == functionSelectorEPWithdrawTo ||
-				functionSelector == functionSelectorEPWithdrawStake) {
+				functionSelector == functionSelectorEPWithdrawStake) { //EntryPoint withdrawal rules
 			// Extract the next 32 bytes which contain the address
 			encodedAddress := msg.Data[4:36]    // 4 bytes of function selector + 32 bytes for address
 			addressBytes := encodedAddress[12:] //The actual address is the last 20 bytes of this 32-qbyte block
