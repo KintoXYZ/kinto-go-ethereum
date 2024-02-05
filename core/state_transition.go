@@ -414,35 +414,36 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	//Hardcoded addresses
 	aaEntryPointEnvAddress := common.HexToAddress("0x351110fC667dA12B5d07AEDaE6e90f17BAF512C0")
-	kintoIdEnvAddress := common.HexToAddress("0xD5e0E7342Ad607516e177fDC9133E38e1a57679A")
-	walletFactoryAddress := common.HexToAddress("0xDed93a06edd053538c8F6b9A5ee07a45Fc590Fa4")
-	paymasterAddress := common.HexToAddress("0x77d878C48d13e11F0932616a0c43306cf17A2e25")
+	kintoIdEnvAddress := common.HexToAddress("0xa812c34cB952039934B6e0b86E91F628ce0092aa")
+	walletFactoryAddress := common.HexToAddress("0x2fdECA9826f3dA40E7ebe463Bd0BC8CE5a274752")
+	paymasterAddress := common.HexToAddress("0x6ecDCd6C797Cb1D358eB436935095d0b04949fb9")
 
 	//Hardcoded function selectors for EntryPoint
-	functionSelectorEPWithdrawTo := "205c2878" //   "withdrawTo(address,uint256)": "205c2878"
-	functionSelectorEPWithdrawStake := "c23a5cea" //   "withdrawStake(address)": "c23a5cea",
-	functionSelectorEPHandleOps := "1fad948c"//  "handleOps((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address)": "1fad948c",
-	functionSelectorEPHandleAggregatedOps := "4b1d7cf5"//  "handleAggregatedOps(((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address,bytes)[],address)": "4b1d7cf5",
+	functionSelectorEPWithdrawTo := "205c2878"          //   "withdrawTo(address,uint256)": "205c2878"
+	functionSelectorEPWithdrawStake := "c23a5cea"       //   "withdrawStake(address)": "c23a5cea",
+	functionSelectorEPHandleOps := "1fad948c"           //  "handleOps((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address)": "1fad948c",
+	functionSelectorEPHandleAggregatedOps := "4b1d7cf5" //  "handleAggregatedOps(((address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes)[],address,bytes)[],address)": "4b1d7cf5",
 
 	//Hardcoded function selectors for Sponsorpaymaster
 	functionSelectorSPWithdrawTo := "205c2878" // "withdrawTo(address,uint256)": "205c2878"
-	functionSelectorSPDeposit := "d0e30db0"//  "deposit()": "d0e30db0",
+	functionSelectorSPDeposit := "d0e30db0"    //  "deposit()": "d0e30db0",
 
 	functionSelector := ""
 	if len(msg.Data) >= 4 {
-    functionSelector = hex.EncodeToString(msg.Data[:4])
+		functionSelector = hex.EncodeToString(msg.Data[:4])
 	}
 
 	log.Warn("******FUNCTION SELECTOR", "functionSelector", functionSelector)
 
-
-	//First 1000 blocks allow us to deploy required contracts can be modified later
+	//First 100 blocks allow us to deploy required contracts can be modified later
 	KINTO_RULES_BLOCK_START := big.NewInt(int64(100))
+	//Block for hardfork to take place
+	KINTO_HARDFORK_1 := big.NewInt(int64(110))
 
 	destination := msg.To
 	currentBlockNumber := st.evm.Context.BlockNumber
 
-	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 && msg.TxRunMode != MessageEthcallMode {
+	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 && msg.TxRunMode != MessageEthcallMode { //ORIGINAL KINTO RULES
 		if destination == nil {
 			return nil, fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 		} else if !(*destination == aaEntryPointEnvAddress ||
@@ -450,10 +451,30 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			*destination == walletFactoryAddress ||
 			*destination == paymasterAddress) {
 			return nil, fmt.Errorf("%w: %v is trying to tx against an invalid address, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
-		} else if *destination == aaEntryPointEnvAddress && 
-			(functionSelector == functionSelectorEPWithdrawTo || 
-			 functionSelector == functionSelectorEPWithdrawStake) {
-			
+		}
+	}
+
+	if currentBlockNumber.Cmp(KINTO_HARDFORK_1) > 0 { //HARDFORK #1 RULES
+		//EntryPoint withdrawal rules
+		if *destination == aaEntryPointEnvAddress &&
+			(functionSelector == functionSelectorEPWithdrawTo ||
+				functionSelector == functionSelectorEPWithdrawStake) {
+			// Extract the next 32 bytes which contain the address
+			encodedAddress := msg.Data[4:36]    // 4 bytes of function selector + 32 bytes for address
+			addressBytes := encodedAddress[12:] //The actual address is the last 20 bytes of this 32-qbyte block
+
+			paramAddress := common.HexToAddress("0x" + hex.EncodeToString(addressBytes)) // Convert to a hex string and add the '0x' prefix
+			log.Warn("******msg.From", "msg.From", msg.From)
+			log.Warn("******msg.Data", "msg.Data", msg.Data)
+			log.Warn("******paramAddress", "paramAddress", paramAddress)
+
+			if msg.From != paramAddress {
+				return nil, fmt.Errorf("%w: %v is trying to handleOps/handleAggregatedOps from EntryPoint to a beneficiary different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), paramAddress)
+			}
+		} else if *destination == aaEntryPointEnvAddress &&
+			(functionSelector == functionSelectorEPHandleOps ||
+				functionSelector == functionSelectorEPHandleAggregatedOps) { //ENTRYPOINT HANDLEOPS/HANDLEAGGREGATED OPS RULES
+
 			// the offset for the dynamic array (user ops) is the first 32 bytes after the function selector and the beneficiary comes after
 			data := msg.Data[4:] // remove function selector
 			if len(data) >= 32 { // ensure there's enough data
@@ -465,6 +486,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 					// Convert the extracted bytes to an Ethereum address
 					beneficiaryAddress := common.HexToAddress("0x" + hex.EncodeToString(beneficiaryBytes))
 					log.Warn("******msg.From", "msg.From", msg.From)
+					log.Warn("******msg.Data", "msg.Data", msg.Data)
 					log.Warn("******beneficiaryAddress", "beneficiaryAddress", beneficiaryAddress)
 
 					if msg.From != beneficiaryAddress {
@@ -472,27 +494,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 					}
 				}
 			}
-		} else if *destination == aaEntryPointEnvAddress &&
-			(functionSelector == functionSelectorEPHandleOps ||
-		 	 functionSelector == functionSelectorEPHandleAggregatedOps) {
-
-				if len(msg.Data) >= 32 { // Ensure there's enough data
-        	encodedAddress := msg.Data[len(msg.Data)-32:] // Last 32 bytes
-        	addressBytes := encodedAddress[12:] // Last 20 bytes of the 32-byte block
-
-        	// Convert the extracted bytes to an Ethereum address
-        	beneficiaryAddress := common.HexToAddress("0x" + hex.EncodeToString(addressBytes))
-					log.Warn("******msg.From", "msg.From", msg.From)
-					log.Warn("******beneficiaryAddress", "beneficiaryAddress", beneficiaryAddress)
-
-					if(msg.From != beneficiaryAddress) {
-						return nil, fmt.Errorf("%w: %v is trying to handleOps/handleAggregatedOps from EntryPoint to a beneficiary different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
-					}
-   			}
-		} else if *destination == paymasterAddress && 
+		} else if *destination == paymasterAddress &&
 			(functionSelector == functionSelectorSPWithdrawTo ||
-			 functionSelector == functionSelectorSPDeposit) {
-				return nil, fmt.Errorf("%w: %v SponsorPaymaster withDrawTo() and deposit() are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+				functionSelector == functionSelectorSPDeposit) { //ENTRYPOINT PAYMASTER RULES
+			return nil, fmt.Errorf("%w: %v SponsorPaymaster withDrawTo() and deposit() are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 		}
 	}
 
