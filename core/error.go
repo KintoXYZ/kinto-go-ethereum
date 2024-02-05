@@ -102,5 +102,5 @@ var (
 	ErrSenderNoEOA = errors.New("sender not an eoa")
 
 	// ErrKintoNotAllowed
-	ErrKintoNotAllowed = errors.New("Kinto does not allow EOAs or txs that not target our known contracts")
+	ErrKintoNotAllowed = errors.New("kinto did not allow this transaction")
 )
