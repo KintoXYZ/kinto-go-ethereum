@@ -84,11 +84,11 @@ func enforceOriginalKintoRules(msg *Message) error {
 	destination := msg.To
 
 	if destination == nil {
-		return fmt.Errorf("%w: EOAs can't create contracts directly", ErrKintoNotAllowed)
+		return fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 	}
 
 	if _, ok := originalKintoAddresses[*destination]; !ok {
-		return fmt.Errorf("%w: Transaction to address %v is not permitted", ErrKintoNotAllowed, destination.Hex())
+		return fmt.Errorf("%w: %v is trying to tx against an invalid address, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 	}
 
 	return nil
