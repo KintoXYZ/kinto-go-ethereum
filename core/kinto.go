@@ -38,7 +38,7 @@ const (
 // Block numbers for Kinto rule changes
 var (
 	KintoRulesBlockStart = big.NewInt(100)
-	KintoHardfork1       = big.NewInt(110)
+	KintoHardfork1       = big.NewInt(150)
 )
 
 // Valid Kinto addresses before the hardfork
@@ -60,6 +60,10 @@ var hardfork1KintoAddresses = map[common.Address]bool{
 
 // enforceKinto decides which set of Kinto rules to apply based on the current block number
 func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
+	if msg.TxRunMode == MessageEthcallMode {
+		return nil //allow all calls
+	}
+
 	if currentBlockNumber.Cmp(KintoRulesBlockStart) > 0 {
 		if currentBlockNumber.Cmp(KintoHardfork1) <= 0 {
 			if err := enforceOriginalKintoRules(msg); err != nil {
