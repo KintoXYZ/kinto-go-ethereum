@@ -6,16 +6,15 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Kinto addresses
 var (
-	aaEntryPointEnvAddress = common.HexToAddress("0x351110fC667dA12B5d07AEDaE6e90f17BAF512C0")
-	kintoIdEnvAddress      = common.HexToAddress("0xa812c34cB952039934B6e0b86E91F628ce0092aa")
-	walletFactoryAddress   = common.HexToAddress("0x2fdECA9826f3dA40E7ebe463Bd0BC8CE5a274752")
-	paymasterAddress       = common.HexToAddress("0x6ecDCd6C797Cb1D358eB436935095d0b04949fb9")
-	appRegistryAddress     = common.HexToAddress("0x79609fCE4791C3f0067aDEc72DcDB1a89cCbf58F")
+	aaEntryPointEnvAddress = common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
+	kintoIdEnvAddress      = common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
+	walletFactoryAddress   = common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
+	paymasterAddress       = common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
+	appRegistryAddress     = common.HexToAddress("0x5A2b641b84b0230C8e75F55d5afd27f4Dbd59d5b")
 )
 
 // Kinto-specific constants for function selectors
@@ -38,7 +37,7 @@ const (
 // Block numbers for Kinto rule changes
 var (
 	KintoRulesBlockStart = big.NewInt(100)
-	KintoHardfork1       = big.NewInt(150)
+	KintoHardfork1       = big.NewInt(58000)
 )
 
 // Valid Kinto addresses before the hardfork
@@ -80,7 +79,6 @@ func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
 
 // enforceOriginalKintoRules applies the original Kinto rules
 func enforceOriginalKintoRules(msg *Message) error {
-	log.Warn("****** KINTO ORIGINAL RULES ******")
 	destination := msg.To
 
 	if destination == nil {
@@ -96,7 +94,6 @@ func enforceOriginalKintoRules(msg *Message) error {
 
 // enforceHardForkOneRules applies the Kinto rules after the first hardfork
 func enforceHardForkOneRules(msg *Message) error {
-	log.Warn("****** KINTO HARDFORK #1 RULES ******")
 	destination := msg.To
 	functionSelector := extractFunctionSelector(msg.Data)
 
