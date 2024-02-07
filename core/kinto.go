@@ -37,7 +37,7 @@ const (
 // Block numbers for Kinto rule changes
 var (
 	KintoRulesBlockStart = big.NewInt(100)
-	KintoHardfork1       = big.NewInt(58000)
+	KintoHardfork1       = big.NewInt(57000)
 )
 
 // Valid Kinto addresses before the hardfork
