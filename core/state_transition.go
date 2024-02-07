@@ -360,6 +360,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// 4. the purchased gas is enough to cover intrinsic usage
 	// 5. there is no overflow when calculating intrinsic gas
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
+	// 7. Kinto rules
 
 	// Arbitrum: drop tip for delayed (and old) messages
 	if st.evm.ProcessingHook.DropTip() && st.msg.GasPrice.Cmp(st.evm.Context.BaseFee) > 0 {
@@ -408,28 +409,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	// Check clause 7 - KINTO L2
-
-	// Building addresses from .env, at a later stage we prob should hardcode.
-	aaEntryPointEnvAddress := common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
-	kintoIdEnvAddress := common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
-	walletFactoryAddress := common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
-	paymasterAddress := common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
-
-	//First 100 blocks allow us to deploy required contracts can be modified later
-	KINTO_RULES_BLOCK_START := big.NewInt(int64(100))
-
-	destination := msg.To
-	currentBlockNumber := st.evm.Context.BlockNumber
-
-	if currentBlockNumber.Cmp(KINTO_RULES_BLOCK_START) > 0 && msg.TxRunMode != MessageEthcallMode {
-		if destination == nil {
-			return nil, fmt.Errorf("%w: %v is trying to create a contract directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
-		} else if !(*destination == aaEntryPointEnvAddress ||
-			*destination == kintoIdEnvAddress ||
-			*destination == walletFactoryAddress ||
-			*destination == paymasterAddress) {
-			return nil, fmt.Errorf("%w: %v is trying to tx against an invalid address, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
-		}
+	kintoErr := enforceKinto(msg, st.evm.Context.BlockNumber)
+	if kintoErr != nil {
+		return nil, kintoErr
 	}
 
 	// Check whether the init code size has been exceeded.
