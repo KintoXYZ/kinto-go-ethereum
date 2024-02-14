@@ -25,6 +25,8 @@ const (
 	functionSelectorEPHandleAggregatedOps = "4b1d7cf5"
 	functionSelectorSPWithdrawTo          = "205c2878"
 	functionSelectorSPDeposit             = "d0e30db0"
+	functionSelectorEmpty                 = "00000000" //Hardfork2 start
+	functionSelectorEPDeposit             = "d0e30db0"
 )
 
 const (
@@ -38,6 +40,7 @@ const (
 var (
 	KintoRulesBlockStart = big.NewInt(100)
 	KintoHardfork1       = big.NewInt(57000)
+	KintoHardfork2       = big.NewInt(110000)
 )
 
 // Valid Kinto addresses before the hardfork
@@ -60,18 +63,16 @@ var hardfork1KintoAddresses = map[common.Address]bool{
 // enforceKinto decides which set of Kinto rules to apply based on the current block number
 func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
 	if msg.TxRunMode == MessageEthcallMode {
-		return nil //allow all calls
+		return nil // Allow all calls
 	}
 
 	if currentBlockNumber.Cmp(KintoRulesBlockStart) > 0 {
 		if currentBlockNumber.Cmp(KintoHardfork1) <= 0 {
-			if err := enforceOriginalKintoRules(msg); err != nil {
-				return err
-			}
+			return enforceOriginalKintoRules(msg)
+		} else if currentBlockNumber.Cmp(KintoHardfork2) <= 0 {
+			return enforceHardForkOneRules(msg)
 		} else {
-			if err := enforceHardForkOneRules(msg); err != nil {
-				return err
-			}
+			return enforceHardForkTwoRules(msg) // New condition for Hardfork2
 		}
 	}
 	return nil
@@ -134,6 +135,51 @@ func enforceHardForkOneRules(msg *Message) error {
 	return nil
 }
 
+func enforceHardForkTwoRules(msg *Message) error {
+	destination := msg.To
+	functionSelector := extractFunctionSelector(msg.Data)
+
+	if destination == nil {
+		return fmt.Errorf("%w: %v EOAs can't create contracts directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+	}
+
+	if _, ok := hardfork1KintoAddresses[*destination]; !ok { //addresses are the same for hardfork2
+		return fmt.Errorf("%w: Transaction to address %v is not permitted", ErrKintoNotAllowed, destination.Hex())
+	}
+
+	if *destination == aaEntryPointEnvAddress && isEntryPointWithdraw(functionSelector) {
+		addressBytes := msg.Data[functionSelectorSize+addressOffset : functionSelectorSize+fullWordSize]
+		paramAddress := common.BytesToAddress(addressBytes)
+
+		if msg.From != paramAddress {
+			return fmt.Errorf("%w: %v is trying to withdrawTo/withdrawStake from EntryPoint to a param different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), paramAddress)
+		}
+	}
+
+	if *destination == aaEntryPointEnvAddress && functionSelector == functionSelectorEPHandleOps {
+		data := msg.Data[functionSelectorSize:]
+		if len(data) >= beneficiaryOffset+fullWordSize {
+			beneficiaryEncoded := data[beneficiaryOffset : beneficiaryOffset+fullWordSize]
+			beneficiaryBytes := beneficiaryEncoded[addressOffset:]
+			beneficiaryAddress := common.BytesToAddress(beneficiaryBytes)
+
+			if msg.From != beneficiaryAddress {
+				return fmt.Errorf("%w: %v is trying to handleOps from EntryPoint to a beneficiary different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), beneficiaryAddress)
+			}
+		}
+	}
+
+	if *destination == aaEntryPointEnvAddress && hardForkTwoForbiddenEPFunctions(functionSelector) {
+		return fmt.Errorf("%w: %v EntryPoint depositTo, HandleAggregatedOps and fallback functions are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+	}
+
+	if *destination == paymasterAddress && paymasterFunctionNotAllowed(functionSelector) { //ENTRYPOINT PAYMASTER RULES
+		return fmt.Errorf("%w: %v SponsorPaymaster withDrawTo() and deposit() are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+	}
+
+	return nil
+}
+
 func extractFunctionSelector(data []byte) string {
 	if len(data) < functionSelectorSize {
 		return ""
@@ -151,4 +197,10 @@ func isEntryPointHandleOps(functionSelector string) bool {
 
 func isEntryPointWithdraw(functionSelector string) bool {
 	return (functionSelector == functionSelectorEPWithdrawTo || functionSelector == functionSelectorEPWithdrawStake)
+}
+
+func hardForkTwoForbiddenEPFunctions(functionSelector string) bool {
+	return (functionSelector == functionSelectorEmpty ||
+		functionSelector == functionSelectorEPDeposit ||
+		functionSelector == functionSelectorEPHandleAggregatedOps)
 }
