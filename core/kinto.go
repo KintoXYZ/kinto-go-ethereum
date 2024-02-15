@@ -25,8 +25,8 @@ const (
 	functionSelectorEPHandleAggregatedOps = "4b1d7cf5"
 	functionSelectorSPWithdrawTo          = "205c2878"
 	functionSelectorSPDeposit             = "d0e30db0"
-	functionSelectorEmpty                 = "00000000" //Hardfork2 start
-	functionSelectorEPDeposit             = "d0e30db0"
+	functionSelectorEmpty                 = "" //Hardfork2 start
+	functionSelectorEPDeposit             = "b760faf9"
 )
 
 const (
