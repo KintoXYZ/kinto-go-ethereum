@@ -831,6 +831,10 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 }
 
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.evm.Context.BlockNumber.Cmp(common.KintoHardfork2) > 0 {
+		return nil, &ErrInvalidOpCode{opcode: OpCode(scope.Contract.Code[*pc])}
+	}
+	
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}

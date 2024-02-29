@@ -36,13 +36,6 @@ const (
 	beneficiaryOffset    = 32 // offset to skip the first 32 bytes of the data (function selector) to get to the beneficiary address
 )
 
-// Block numbers for Kinto rule changes
-var (
-	KintoRulesBlockStart = big.NewInt(100)
-	KintoHardfork1       = big.NewInt(57000)
-	KintoHardfork2       = big.NewInt(110000)
-)
-
 // Valid Kinto addresses before the hardfork
 var originalKintoAddresses = map[common.Address]bool{
 	aaEntryPointEnvAddress: true, // aaEntryPointEnvAddress
@@ -66,10 +59,10 @@ func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
 		return nil // Allow all calls
 	}
 
-	if currentBlockNumber.Cmp(KintoRulesBlockStart) > 0 {
-		if currentBlockNumber.Cmp(KintoHardfork1) <= 0 {
+	if currentBlockNumber.Cmp(common.KintoRulesBlockStart) > 0 {
+		if currentBlockNumber.Cmp(common.KintoHardfork1) <= 0 {
 			return enforceOriginalKintoRules(msg)
-		} else if currentBlockNumber.Cmp(KintoHardfork2) <= 0 {
+		} else if currentBlockNumber.Cmp(common.KintoHardfork2) <= 0 {
 			return enforceHardForkOneRules(msg)
 		} else {
 			return enforceHardForkTwoRules(msg) // New condition for Hardfork2
