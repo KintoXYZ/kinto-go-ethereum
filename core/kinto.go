@@ -8,13 +8,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Kinto addresses
-var (
+// Kinto addresses mainnet
+/*var (
 	aaEntryPointEnvAddress = common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
 	kintoIdEnvAddress      = common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
 	walletFactoryAddress   = common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
 	paymasterAddress       = common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 	appRegistryAddress     = common.HexToAddress("0x5A2b641b84b0230C8e75F55d5afd27f4Dbd59d5b")
+	inflatorAddress        = common.HexToAddress("0x336a76a7A2a1e97CE20c420F39FC08c441234aa2")
+)*/
+
+// Kinto addresses devnet
+var (
+	aaEntryPointEnvAddress = common.HexToAddress("0x40Ec0101AEA7A1CC550E445e641AB59dec6daff7")
+	kintoIdEnvAddress      = common.HexToAddress("0x6d2f5f6f0E633c10b6AC4610f09F0392c65128C2")
+	walletFactoryAddress   = common.HexToAddress("0xa3F85Ea46fA7f1008c0061F80c433231f3833700")
+	paymasterAddress       = common.HexToAddress("0x5e55857d72Ad8C88C95ccBad7e21321C73Bf5b17")
+	appRegistryAddress     = common.HexToAddress("0xE3BF35068FaA931259E3F200Ce567da5EC8CC18f")
+	inflatorAddress        = common.HexToAddress("0xAC0fb6eF4EFc90d94b9FA7bcc36894A8caCDCcF0")
 )
 
 // Kinto-specific constants for function selectors
@@ -51,6 +62,16 @@ var hardfork1KintoAddresses = map[common.Address]bool{
 	walletFactoryAddress:   true, // walletFactoryAddress
 	paymasterAddress:       true, // paymasterAddress
 	appRegistryAddress:     true, // appRegistryAddress
+}
+
+// Valid Kinto addresses after the hardfork
+var hardfork2KintoAddresses = map[common.Address]bool{
+	aaEntryPointEnvAddress: true, // aaEntryPointEnvAddress
+	kintoIdEnvAddress:      true, // kintoIdEnvAddress
+	walletFactoryAddress:   true, // walletFactoryAddress
+	paymasterAddress:       true, // paymasterAddress
+	appRegistryAddress:     true, // appRegistryAddress
+	inflatorAddress:        true, // inflatorAddress
 }
 
 // enforceKinto decides which set of Kinto rules to apply based on the current block number
@@ -136,7 +157,7 @@ func enforceHardForkTwoRules(msg *Message) error {
 		return fmt.Errorf("%w: %v EOAs can't create contracts directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 	}
 
-	if _, ok := hardfork1KintoAddresses[*destination]; !ok { //addresses are the same for hardfork2
+	if _, ok := hardfork2KintoAddresses[*destination]; !ok {
 		return fmt.Errorf("%w: Transaction to address %v is not permitted", ErrKintoNotAllowed, destination.Hex())
 	}
 
