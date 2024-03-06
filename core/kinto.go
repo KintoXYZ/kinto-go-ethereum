@@ -16,6 +16,7 @@ import (
 	paymasterAddress       = common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 	appRegistryAddress     = common.HexToAddress("0x5A2b641b84b0230C8e75F55d5afd27f4Dbd59d5b")
 	inflatorAddress        = common.HexToAddress("0x336a76a7A2a1e97CE20c420F39FC08c441234aa2")
+	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
 )*/
 
 // Kinto addresses devnet
@@ -26,6 +27,7 @@ var (
 	paymasterAddress       = common.HexToAddress("0x5e55857d72Ad8C88C95ccBad7e21321C73Bf5b17")
 	appRegistryAddress     = common.HexToAddress("0xE3BF35068FaA931259E3F200Ce567da5EC8CC18f")
 	inflatorAddress        = common.HexToAddress("0xAC0fb6eF4EFc90d94b9FA7bcc36894A8caCDCcF0")
+	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
 )
 
 // Kinto-specific constants for function selectors
@@ -72,6 +74,7 @@ var hardfork2KintoAddresses = map[common.Address]bool{
 	paymasterAddress:       true, // paymasterAddress
 	appRegistryAddress:     true, // appRegistryAddress
 	inflatorAddress:        true, // inflatorAddress
+	upgradeExecutor:        true, // upgradeExecutor
 }
 
 // enforceKinto decides which set of Kinto rules to apply based on the current block number

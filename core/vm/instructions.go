@@ -831,27 +831,38 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 }
 
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	if interpreter.evm.Context.BlockNumber.Cmp(common.KintoHardfork2) > 0 {
-		return nil, &ErrInvalidOpCode{opcode: OpCode(scope.Contract.Code[*pc])}
-	}
-	
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}
-	beneficiary := scope.Stack.pop()
+
+	// Declare the beneficiary variable outside the if-else block
+	var beneficiary common.Address
+
+	// Determine the beneficiary based on the block number
+	if interpreter.evm.Context.BlockNumber.Cmp(common.KintoHardfork2) > 0 {
+		beneficiary = common.HexToAddress(common.SelfDestructWallet)
+	} else {
+		beneficiaryAddr := scope.Stack.pop()
+		beneficiary = common.BytesToAddress(beneficiaryAddr.Bytes())
+	}
+
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
-	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance)
+	interpreter.evm.StateDB.AddBalance(beneficiary, balance) // Use the beneficiary variable directly
 	interpreter.evm.StateDB.Suicide(scope.Contract.Address())
-	if beneficiary.Bytes20() == scope.Contract.Address() {
+
+	if beneficiary == scope.Contract.Address() {
 		// Arbitrum: calling selfdestruct(this) burns the balance
 		interpreter.evm.StateDB.ExpectBalanceBurn(balance)
 	}
+
 	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
-		tracer.CaptureEnter(SELFDESTRUCT, scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance)
+		tracer.CaptureEnter(SELFDESTRUCT, scope.Contract.Address(), beneficiary, []byte{}, 0, balance)
 		tracer.CaptureExit([]byte{}, 0, nil)
 	}
+
 	return nil, errStopToken
 }
+
 
 // following functions are used by the instruction jump  table
 
