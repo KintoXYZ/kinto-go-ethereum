@@ -24,9 +24,9 @@ var (
 	aaEntryPointEnvAddress = common.HexToAddress("0x40Ec0101AEA7A1CC550E445e641AB59dec6daff7")
 	kintoIdEnvAddress      = common.HexToAddress("0x6d2f5f6f0E633c10b6AC4610f09F0392c65128C2")
 	walletFactoryAddress   = common.HexToAddress("0xa3F85Ea46fA7f1008c0061F80c433231f3833700")
-	paymasterAddress       = common.HexToAddress("0x5e55857d72Ad8C88C95ccBad7e21321C73Bf5b17")
+	paymasterAddress       = common.HexToAddress("0xe17E0001A8Df51F8778020c021C11dA76b3dAe2D")
 	appRegistryAddress     = common.HexToAddress("0xE3BF35068FaA931259E3F200Ce567da5EC8CC18f")
-	inflatorAddress        = common.HexToAddress("0xAC0fb6eF4EFc90d94b9FA7bcc36894A8caCDCcF0")
+	inflatorAddress        = common.HexToAddress("0xC56acfC5667FAb27022ab1fd63076Dc02464179e")
 	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
 )
 
