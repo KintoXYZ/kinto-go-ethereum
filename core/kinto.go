@@ -15,7 +15,6 @@ import (
 	walletFactoryAddress   = common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
 	paymasterAddress       = common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 	appRegistryAddress     = common.HexToAddress("0x5A2b641b84b0230C8e75F55d5afd27f4Dbd59d5b")
-	inflatorAddress        = common.HexToAddress("0x336a76a7A2a1e97CE20c420F39FC08c441234aa2")
 	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
 )*/
 
@@ -26,7 +25,6 @@ var (
 	walletFactoryAddress   = common.HexToAddress("0xa3F85Ea46fA7f1008c0061F80c433231f3833700")
 	paymasterAddress       = common.HexToAddress("0xe17E0001A8Df51F8778020c021C11dA76b3dAe2D")
 	appRegistryAddress     = common.HexToAddress("0xE3BF35068FaA931259E3F200Ce567da5EC8CC18f")
-	inflatorAddress        = common.HexToAddress("0xC56acfC5667FAb27022ab1fd63076Dc02464179e")
 	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
 )
 
@@ -73,7 +71,6 @@ var hardfork2KintoAddresses = map[common.Address]bool{
 	walletFactoryAddress:   true, // walletFactoryAddress
 	paymasterAddress:       true, // paymasterAddress
 	appRegistryAddress:     true, // appRegistryAddress
-	inflatorAddress:        true, // inflatorAddress
 	upgradeExecutor:        true, // upgradeExecutor
 }
 
