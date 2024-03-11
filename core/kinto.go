@@ -8,14 +8,25 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Kinto addresses
+// Kinto addresses mainnet
 var (
 	aaEntryPointEnvAddress = common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
 	kintoIdEnvAddress      = common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
 	walletFactoryAddress   = common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
 	paymasterAddress       = common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 	appRegistryAddress     = common.HexToAddress("0x5A2b641b84b0230C8e75F55d5afd27f4Dbd59d5b")
+	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
 )
+
+// Kinto addresses devnet
+/*var (
+	aaEntryPointEnvAddress = common.HexToAddress("0x40Ec0101AEA7A1CC550E445e641AB59dec6daff7")
+	kintoIdEnvAddress      = common.HexToAddress("0x6d2f5f6f0E633c10b6AC4610f09F0392c65128C2")
+	walletFactoryAddress   = common.HexToAddress("0xa3F85Ea46fA7f1008c0061F80c433231f3833700")
+	paymasterAddress       = common.HexToAddress("0xe17E0001A8Df51F8778020c021C11dA76b3dAe2D")
+	appRegistryAddress     = common.HexToAddress("0xE3BF35068FaA931259E3F200Ce567da5EC8CC18f")
+	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
+)*/
 
 // Kinto-specific constants for function selectors
 const (
@@ -25,6 +36,8 @@ const (
 	functionSelectorEPHandleAggregatedOps = "4b1d7cf5"
 	functionSelectorSPWithdrawTo          = "205c2878"
 	functionSelectorSPDeposit             = "d0e30db0"
+	functionSelectorEmpty                 = "" //Hardfork2 start
+	functionSelectorEPDeposit             = "b760faf9"
 )
 
 const (
@@ -32,12 +45,6 @@ const (
 	addressOffset        = 12 // offset to skip leading zeros in a 32-byte word to get to the 20-byte address
 	fullWordSize         = 32 // size of a full 32-byte word, standard in Ethereum for holding a word
 	beneficiaryOffset    = 32 // offset to skip the first 32 bytes of the data (function selector) to get to the beneficiary address
-)
-
-// Block numbers for Kinto rule changes
-var (
-	KintoRulesBlockStart = big.NewInt(100)
-	KintoHardfork1       = big.NewInt(57000)
 )
 
 // Valid Kinto addresses before the hardfork
@@ -57,21 +64,29 @@ var hardfork1KintoAddresses = map[common.Address]bool{
 	appRegistryAddress:     true, // appRegistryAddress
 }
 
+// Valid Kinto addresses after the hardfork
+var hardfork2KintoAddresses = map[common.Address]bool{
+	aaEntryPointEnvAddress: true, // aaEntryPointEnvAddress
+	kintoIdEnvAddress:      true, // kintoIdEnvAddress
+	walletFactoryAddress:   true, // walletFactoryAddress
+	paymasterAddress:       true, // paymasterAddress
+	appRegistryAddress:     true, // appRegistryAddress
+	upgradeExecutor:        true, // upgradeExecutor
+}
+
 // enforceKinto decides which set of Kinto rules to apply based on the current block number
 func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
 	if msg.TxRunMode == MessageEthcallMode {
-		return nil //allow all calls
+		return nil // Allow all calls
 	}
 
-	if currentBlockNumber.Cmp(KintoRulesBlockStart) > 0 {
-		if currentBlockNumber.Cmp(KintoHardfork1) <= 0 {
-			if err := enforceOriginalKintoRules(msg); err != nil {
-				return err
-			}
+	if currentBlockNumber.Cmp(common.KintoRulesBlockStart) > 0 {
+		if currentBlockNumber.Cmp(common.KintoHardfork1) <= 0 {
+			return enforceOriginalKintoRules(msg)
+		} else if currentBlockNumber.Cmp(common.KintoHardfork2) <= 0 {
+			return enforceHardForkOneRules(msg)
 		} else {
-			if err := enforceHardForkOneRules(msg); err != nil {
-				return err
-			}
+			return enforceHardForkTwoRules(msg) // New condition for Hardfork2
 		}
 	}
 	return nil
@@ -134,6 +149,51 @@ func enforceHardForkOneRules(msg *Message) error {
 	return nil
 }
 
+func enforceHardForkTwoRules(msg *Message) error {
+	destination := msg.To
+	functionSelector := extractFunctionSelector(msg.Data)
+
+	if destination == nil {
+		return fmt.Errorf("%w: %v EOAs can't create contracts directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+	}
+
+	if _, ok := hardfork2KintoAddresses[*destination]; !ok {
+		return fmt.Errorf("%w: Transaction to address %v is not permitted", ErrKintoNotAllowed, destination.Hex())
+	}
+
+	if *destination == aaEntryPointEnvAddress && isEntryPointWithdraw(functionSelector) {
+		addressBytes := msg.Data[functionSelectorSize+addressOffset : functionSelectorSize+fullWordSize]
+		paramAddress := common.BytesToAddress(addressBytes)
+
+		if msg.From != paramAddress {
+			return fmt.Errorf("%w: %v is trying to withdrawTo/withdrawStake from EntryPoint to a param different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), paramAddress)
+		}
+	}
+
+	if *destination == aaEntryPointEnvAddress && functionSelector == functionSelectorEPHandleOps {
+		data := msg.Data[functionSelectorSize:]
+		if len(data) >= beneficiaryOffset+fullWordSize {
+			beneficiaryEncoded := data[beneficiaryOffset : beneficiaryOffset+fullWordSize]
+			beneficiaryBytes := beneficiaryEncoded[addressOffset:]
+			beneficiaryAddress := common.BytesToAddress(beneficiaryBytes)
+
+			if msg.From != beneficiaryAddress {
+				return fmt.Errorf("%w: %v is trying to handleOps from EntryPoint to a beneficiary different than the sender, %v", ErrKintoNotAllowed, msg.From.Hex(), beneficiaryAddress)
+			}
+		}
+	}
+
+	if *destination == aaEntryPointEnvAddress && hardForkTwoForbiddenEPFunctions(functionSelector) {
+		return fmt.Errorf("%w: %v EntryPoint depositTo, HandleAggregatedOps and fallback functions are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+	}
+
+	if *destination == paymasterAddress && paymasterFunctionNotAllowed(functionSelector) { //ENTRYPOINT PAYMASTER RULES
+		return fmt.Errorf("%w: %v SponsorPaymaster withDrawTo() and deposit() are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
+	}
+
+	return nil
+}
+
 func extractFunctionSelector(data []byte) string {
 	if len(data) < functionSelectorSize {
 		return ""
@@ -151,4 +211,10 @@ func isEntryPointHandleOps(functionSelector string) bool {
 
 func isEntryPointWithdraw(functionSelector string) bool {
 	return (functionSelector == functionSelectorEPWithdrawTo || functionSelector == functionSelectorEPWithdrawStake)
+}
+
+func hardForkTwoForbiddenEPFunctions(functionSelector string) bool {
+	return (functionSelector == functionSelectorEmpty ||
+		functionSelector == functionSelectorEPDeposit ||
+		functionSelector == functionSelectorEPHandleAggregatedOps)
 }
