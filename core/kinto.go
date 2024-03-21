@@ -9,25 +9,33 @@ import (
 )
 
 // Kinto addresses mainnet
-/*var (
+/*
+var (
 	aaEntryPointEnvAddress = common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
 	kintoIdEnvAddress      = common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
 	walletFactoryAddress   = common.HexToAddress("0x8a4720488CA32f1223ccFE5A087e250fE3BC5D75")
 	paymasterAddress       = common.HexToAddress("0x1842a4EFf3eFd24c50B63c3CF89cECEe245Fc2bd")
 	appRegistryAddress     = common.HexToAddress("0x5A2b641b84b0230C8e75F55d5afd27f4Dbd59d5b")
 	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
-	l2ERC20GatewayAddress  = common.HexToAddress("0x87799989341A07F495287B1433eea98398FD73aA")
-)*/
+	customGatewayAddress   = common.HexToAddress("0x06FcD8264caF5c28D86eb4630c20004aa1faAaA8")
+	gatewayRouterAddress   = common.HexToAddress("0x340487b92808B84c2bd97C87B590EE81267E04a7")
+	standardGatewayAddress = common.HexToAddress("0x87799989341A07F495287B1433eea98398FD73aA")
+	wethGateWayAddress     = common.HexToAddress("0xd563ECBDF90EBA783d0a218EFf158C1263ad02BE")
+)
+*/
 
 // Kinto addresses devnet
 var (
-	aaEntryPointEnvAddress = common.HexToAddress("0x40Ec0101AEA7A1CC550E445e641AB59dec6daff7")
-	kintoIdEnvAddress      = common.HexToAddress("0x6d2f5f6f0E633c10b6AC4610f09F0392c65128C2")
-	walletFactoryAddress   = common.HexToAddress("0xa3F85Ea46fA7f1008c0061F80c433231f3833700")
-	paymasterAddress       = common.HexToAddress("0xe17E0001A8Df51F8778020c021C11dA76b3dAe2D")
-	appRegistryAddress     = common.HexToAddress("0xE3BF35068FaA931259E3F200Ce567da5EC8CC18f")
-	upgradeExecutor        = common.HexToAddress("0x88e03D41a6EAA9A0B93B0e2d6F1B34619cC4319b")
-	l2ERC20GatewayAddress  = common.HexToAddress("0x87799989341A07F495287B1433eea98398FD73aA")
+	aaEntryPointEnvAddress = common.HexToAddress("0xEeb65A06722E6B7141114980Fff7d86CCB14F435")
+	kintoIdEnvAddress      = common.HexToAddress("0xd7Fa9143481d9c48DF79Bb042A6A7a51C99112B6")
+	walletFactoryAddress   = common.HexToAddress("0xB6816E20AfC8412b7D6eD491F0c41317315c29D3")
+	paymasterAddress       = common.HexToAddress("0x29C157fb553D9EAD78e5084F74E02F2ACEbE6770")
+	appRegistryAddress     = common.HexToAddress("0xF2c5B9400a562c6429db9f015eD705C1CA8458A9")
+	upgradeExecutor        = common.HexToAddress("0x6B0d3F40DeD9720938DB274f752F1e11532c2640")
+	customGatewayAddress   = common.HexToAddress("0x094F8C3eA1b5671dd19E15eCD93C80d2A33fCA99")
+	gatewayRouterAddress   = common.HexToAddress("0xf3AC740Fcc64eEd76dFaE663807749189A332d54")
+	standardGatewayAddress = common.HexToAddress("0x6A8d32c495df943212B7788114e41103047150a5")
+	wethGateWayAddress     = common.HexToAddress("0x79B47F0695608aD8dc90E400a3E123b02eB72D24")
 )
 
 // Kinto-specific constants for function selectors
@@ -83,7 +91,10 @@ var hardfork3KintoAddresses = map[common.Address]bool{
 	paymasterAddress:       true, // paymasterAddress
 	appRegistryAddress:     true, // appRegistryAddress
 	upgradeExecutor:        true, // upgradeExecutor
-	l2ERC20GatewayAddress:  true, // l2ERC20GatewayAddress
+	customGatewayAddress:   true, // customGatewayAddress
+	gatewayRouterAddress:   true, // gatewayRouterAddress
+	standardGatewayAddress: true, // standardGatewayAddress
+	wethGateWayAddress:     true, // wethGateWayAddress
 }
 
 // enforceKinto decides which set of Kinto rules to apply based on the current block number
