@@ -9,7 +9,7 @@ import (
 )
 
 // Kinto addresses mainnet
-/*
+
 var (
 	aaEntryPointEnvAddress = common.HexToAddress("0x2843C269D2a64eCfA63548E8B3Fc0FD23B7F70cb")
 	kintoIdEnvAddress      = common.HexToAddress("0xf369f78E3A0492CC4e96a90dae0728A38498e9c7")
@@ -22,9 +22,10 @@ var (
 	standardGatewayAddress = common.HexToAddress("0x87799989341A07F495287B1433eea98398FD73aA")
 	wethGateWayAddress     = common.HexToAddress("0xd563ECBDF90EBA783d0a218EFf158C1263ad02BE")
 )
-*/
+
 
 // Kinto addresses devnet
+/*
 var (
 	aaEntryPointEnvAddress = common.HexToAddress("0xEeb65A06722E6B7141114980Fff7d86CCB14F435")
 	kintoIdEnvAddress      = common.HexToAddress("0xd7Fa9143481d9c48DF79Bb042A6A7a51C99112B6")
@@ -37,6 +38,7 @@ var (
 	standardGatewayAddress = common.HexToAddress("0x6A8d32c495df943212B7788114e41103047150a5")
 	wethGateWayAddress     = common.HexToAddress("0x79B47F0695608aD8dc90E400a3E123b02eB72D24")
 )
+*/
 
 // Kinto-specific constants for function selectors
 const (
