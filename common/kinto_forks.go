@@ -9,5 +9,6 @@ var (
 	KintoRulesBlockStart = big.NewInt(100)
 	KintoHardfork1       = big.NewInt(57000)
 	KintoHardfork2       = big.NewInt(118000)
+	KintoHardfork3       = big.NewInt(125000)
 	SelfDestructWallet   = "0x660ad4B5A74130a4796B4d54BC6750Ae93C86e6c"
 )
