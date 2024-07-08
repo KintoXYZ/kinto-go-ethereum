@@ -101,6 +101,9 @@ var (
 	// ErrSenderNoEOA is returned if the sender of a transaction is a contract.
 	ErrSenderNoEOA = errors.New("sender not an eoa")
 
+	// ErrKintoNotAllowed
+	ErrKintoNotAllowed = errors.New("Kinto does not allow EOAs or txs that not target our known contracts")
+
 	// ErrBlobFeeCapTooLow is returned if the transaction fee cap is less than the
 	// blob gas fee of the block.
 	ErrBlobFeeCapTooLow = errors.New("max fee per blob gas less than block blob gas fee")

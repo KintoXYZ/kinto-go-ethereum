@@ -425,6 +425,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// 4. the purchased gas is enough to cover intrinsic usage
 	// 5. there is no overflow when calculating intrinsic gas
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
+	// 7. Kinto rules
 
 	// Arbitrum: drop tip for delayed (and old) messages
 	if st.evm.ProcessingHook.DropTip() && st.msg.GasPrice.Cmp(st.evm.Context.BaseFee) > 0 {
@@ -474,6 +475,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 	if !value.IsZero() && !st.evm.Context.CanTransfer(st.state, msg.From, value) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From.Hex())
+	}
+
+	// Check clause 7 - KINTO L2
+	kintoErr := enforceKinto(msg, st)
+	if kintoErr != nil {
+		return nil, kintoErr
 	}
 
 	// Check whether the init code size has been exceeded.
