@@ -66,14 +66,16 @@ var (
 
 // Kinto-specific constants for function selectors
 const (
-	functionSelectorEPWithdrawTo          = "205c2878"
-	functionSelectorEPWithdrawStake       = "c23a5cea"
-	functionSelectorEPHandleOps           = "1fad948c"
-	functionSelectorEPHandleAggregatedOps = "4b1d7cf5"
-	functionSelectorSPWithdrawTo          = "205c2878"
-	functionSelectorSPDeposit             = "d0e30db0"
-	functionSelectorEmpty                 = "" //Hardfork2 start
-	functionSelectorEPDeposit             = "b760faf9"
+	functionSelectorEPWithdrawTo            = "205c2878"
+	functionSelectorEPWithdrawStake         = "c23a5cea"
+	functionSelectorEPHandleOps             = "1fad948c"
+	functionSelectorEPHandleAggregatedOps   = "4b1d7cf5"
+	functionSelectorEPHandleOpsV7           = "765e827f"
+	functionSelectorEPHandleAggregatedOpsV7 = "dbed18e0"
+	functionSelectorSPWithdrawTo            = "205c2878"
+	functionSelectorSPDeposit               = "d0e30db0"
+	functionSelectorEmpty                   = "" //Hardfork2 start
+	functionSelectorEPDeposit               = "b760faf9"
 )
 
 const (

@@ -72,7 +72,7 @@ func enforceHardForkSixRules(st *StateTransition) error {
 		}
 	}
 
-	if isEntryPointAddress(*destination) && functionSelector == functionSelectorEPHandleOps {
+	if isHandleOps(*destination, functionSelector) {
 		data := msg.Data[functionSelectorSize:]
 		if len(data) >= beneficiaryOffset+fullWordSize {
 			beneficiaryEncoded := data[beneficiaryOffset : beneficiaryOffset+fullWordSize]
@@ -85,7 +85,7 @@ func enforceHardForkSixRules(st *StateTransition) error {
 		}
 	}
 
-	if isEntryPointAddress(*destination) && hardForkTwoForbiddenEPFunctions(functionSelector) {
+	if isEntryPointAddress(*destination) && hardForkSixForbiddenEPFunctions(functionSelector) {
 		return fmt.Errorf("%w: %v EntryPoint depositTo, HandleAggregatedOps and fallback functions are not allowed , %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 	}
 
@@ -114,10 +114,7 @@ func isContractCallAllowedFromEOA(st *StateTransition, from, to common.Address) 
 		return false, fmt.Errorf("error packing function call: %v", err)
 	}
 
-	gasLimit := uint64(100000)
-	value := uint256.NewInt(0)
-
-	ret, _, err := st.evm.Call(vm.AccountRef(from), appRegistryAddress, input, gasLimit, value)
+	ret, _, err := st.evm.Call(vm.AccountRef(from), appRegistryAddress, input, uint64(100000), uint256.NewInt(0))
 	if err != nil {
 		return false, fmt.Errorf("error executing contract call: %v", err)
 	}
@@ -137,4 +134,15 @@ func isContractCallAllowedFromEOA(st *StateTransition, from, to common.Address) 
 
 func isEntryPointAddress(address common.Address) bool {
 	return address == aaEntryPointEnvAddress || address == aaEntryPointEnvAddressV7
+}
+
+func isHandleOps(address common.Address, functionSelector string) bool {
+	return isEntryPointAddress(address) && (functionSelector == functionSelectorEPHandleOps || functionSelector == functionSelectorEPHandleOpsV7)
+}
+
+func hardForkSixForbiddenEPFunctions(functionSelector string) bool {
+	return (functionSelector == functionSelectorEmpty ||
+		functionSelector == functionSelectorEPDeposit ||
+		functionSelector == functionSelectorEPHandleAggregatedOps ||
+		functionSelector == functionSelectorEPHandleOpsV7)
 }
