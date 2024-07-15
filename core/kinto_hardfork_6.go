@@ -37,6 +37,8 @@ var hardfork6KintoAddresses = map[common.Address]bool{
 	aaEntryPointEnvAddressV7:    true,  // aaEntryPointEnvAddressv7
 }
 
+var ZeroAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
+
 func enforceHardForkSixRules(st *StateTransition) error {
 	msg := st.msg
 
@@ -47,6 +49,10 @@ func enforceHardForkSixRules(st *StateTransition) error {
 	destination := msg.To
 	origin := msg.From
 
+	if destination == nil {
+		destination = &ZeroAddress
+	}
+
 	allowed, err := isContractCallAllowedFromEOA(st, origin, *destination)
 
 	if allowed && err == nil {
@@ -55,7 +61,7 @@ func enforceHardForkSixRules(st *StateTransition) error {
 
 	functionSelector := extractFunctionSelector(msg.Data)
 
-	if destination == nil {
+	if *destination == ZeroAddress {
 		return fmt.Errorf("%w: %v EOAs can't create contracts directly, %v", ErrKintoNotAllowed, msg.From.Hex(), destination)
 	}
 
