@@ -10,6 +10,7 @@ var (
 	KintoHardfork1       = big.NewInt(57000)  //57000
 	KintoHardfork2       = big.NewInt(118000) //118000
 	KintoHardfork3       = big.NewInt(125000) //125000
-	KintoHardfork4       = big.NewInt(133000) //130000
+	KintoHardfork4       = big.NewInt(133000) //133000
+	KintoHardfork5       = big.NewInt(186000)
 	SelfDestructWallet   = "0x660ad4B5A74130a4796B4d54BC6750Ae93C86e6c"
 )

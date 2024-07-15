@@ -20,7 +20,6 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"testing"
 	"time"
@@ -30,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 // randomHash generates a random blob of data and returns it as a hash.
@@ -43,11 +43,10 @@ func randomHash() common.Hash {
 
 // randomAccount generates a random account and returns it RLP encoded.
 func randomAccount() []byte {
-	root := randomHash()
-	a := Account{
-		Balance:  big.NewInt(rand.Int63()),
+	a := &types.StateAccount{
+		Balance:  uint256.NewInt(rand.Uint64()),
 		Nonce:    rand.Uint64(),
-		Root:     root[:],
+		Root:     randomHash(),
 		CodeHash: types.EmptyCodeHash[:],
 	}
 	data, _ := rlp.EncodeToBytes(a)
@@ -466,7 +465,7 @@ func TestReadStateDuringFlattening(t *testing.T) {
 	snap := snaps.Snapshot(common.HexToHash("0xa3"))
 
 	// Register the testing hook to access the state after flattening
-	var result = make(chan *Account)
+	var result = make(chan *types.SlimAccount)
 	snaps.onFlatten = func() {
 		// Spin up a thread to read the account from the pre-created
 		// snapshot handler. It's expected to be blocked.

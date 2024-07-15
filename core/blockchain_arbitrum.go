@@ -18,6 +18,7 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/state"
@@ -39,18 +40,9 @@ func (bc *BlockChain) WriteBlockAndSetHeadWithTime(block *types.Block, receipts 
 func (bc *BlockChain) ReorgToOldBlock(newHead *types.Block) error {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
-	bc.chainmu.MustLock()
-	defer bc.chainmu.Unlock()
-	oldHead := bc.CurrentBlock()
-	if oldHead.Hash() == newHead.Hash() {
-		return nil
+	if _, err := bc.SetCanonical(newHead); err != nil {
+		return fmt.Errorf("error reorging to old block: %w", err)
 	}
-	bc.writeHeadBlock(newHead)
-	err := bc.reorg(oldHead, newHead)
-	if err != nil {
-		return err
-	}
-	bc.chainHeadFeed.Send(ChainHeadEvent{Block: newHead})
 	return nil
 }
 

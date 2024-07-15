@@ -14,6 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -22,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/filters"
@@ -32,8 +35,17 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+var (
+	liveStatesReferencedCounter        = metrics.NewRegisteredCounter("arb/apibackend/states/live/referenced", nil)
+	liveStatesDereferencedCounter      = metrics.NewRegisteredCounter("arb/apibackend/states/live/dereferenced", nil)
+	recreatedStatesReferencedCounter   = metrics.NewRegisteredCounter("arb/apibackend/states/recreated/referenced", nil)
+	recreatedStatesDereferencedCounter = metrics.NewRegisteredCounter("arb/apibackend/states/recreated/dereferenced", nil)
+)
+
 type APIBackend struct {
 	b *Backend
+
+	dbForAPICalls ethdb.Database
 
 	fallbackClient types.FallbackClient
 	sync           SyncProgressBackend
@@ -86,19 +98,33 @@ type SyncProgressBackend interface {
 	FinalizedBlockNumber(ctx context.Context) (uint64, error)
 }
 
-func createRegisterAPIBackend(backend *Backend, sync SyncProgressBackend, filterConfig filters.Config, fallbackClientUrl string, fallbackClientTimeout time.Duration) (*filters.FilterSystem, error) {
+func createRegisterAPIBackend(backend *Backend, filterConfig filters.Config, fallbackClientUrl string, fallbackClientTimeout time.Duration) (*filters.FilterSystem, error) {
 	fallbackClient, err := CreateFallbackClient(fallbackClientUrl, fallbackClientTimeout)
 	if err != nil {
 		return nil, err
 	}
+	// discard stylus-tag on any call made from api database
+	dbForAPICalls := backend.chainDb
+	wasmStore, tag := backend.chainDb.WasmDataBase()
+	if tag != 0 {
+		dbForAPICalls = rawdb.WrapDatabaseWithWasm(backend.chainDb, wasmStore, 0)
+	}
 	backend.apiBackend = &APIBackend{
 		b:              backend,
+		dbForAPICalls:  dbForAPICalls,
 		fallbackClient: fallbackClient,
-		sync:           sync,
 	}
 	filterSystem := filters.NewFilterSystem(backend.apiBackend, filterConfig)
 	backend.stack.RegisterAPIs(backend.apiBackend.GetAPIs(filterSystem))
 	return filterSystem, nil
+}
+
+func (a *APIBackend) SetSyncBackend(sync SyncProgressBackend) error {
+	if a.sync != nil {
+		return errors.New("sync progress monitor already set")
+	}
+	a.sync = sync
+	return nil
 }
 
 func (a *APIBackend) GetAPIs(filterSystem *filters.FilterSystem) []rpc.API {
@@ -137,8 +163,8 @@ func (a *APIBackend) GetAPIs(filterSystem *filters.FilterSystem) []rpc.API {
 	return apis
 }
 
-func (a *APIBackend) blockChain() *core.BlockChain {
-	return a.b.arb.BlockChain()
+func (a *APIBackend) BlockChain() *core.BlockChain {
+	return a.b.BlockChain()
 }
 
 func (a *APIBackend) GetArbitrumNode() interface{} {
@@ -146,7 +172,7 @@ func (a *APIBackend) GetArbitrumNode() interface{} {
 }
 
 func (a *APIBackend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
-	if body := a.blockChain().GetBody(hash); body != nil {
+	if body := a.BlockChain().GetBody(hash); body != nil {
 		return body, nil
 	}
 	return nil, errors.New("block body not found")
@@ -154,11 +180,16 @@ func (a *APIBackend) GetBody(ctx context.Context, hash common.Hash, number rpc.B
 
 // General Ethereum API
 func (a *APIBackend) SyncProgressMap() map[string]interface{} {
+	if a.sync == nil {
+		res := make(map[string]interface{})
+		res["error"] = "sync object not set in apibackend"
+		return res
+	}
 	return a.sync.SyncProgressMap()
 }
 
 func (a *APIBackend) SyncProgress() ethereum.SyncProgress {
-	progress := a.sync.SyncProgressMap()
+	progress := a.SyncProgressMap()
 
 	if len(progress) == 0 {
 		return ethereum.SyncProgress{}
@@ -184,7 +215,7 @@ func (a *APIBackend) FeeHistory(
 	}
 
 	nitroGenesis := rpc.BlockNumber(a.ChainConfig().ArbitrumChainParams.GenesisBlockNum)
-	newestBlock, latestBlock := a.blockChain().ClipToPostNitroGenesis(newestBlock)
+	newestBlock, latestBlock := a.BlockChain().ClipToPostNitroGenesis(newestBlock)
 
 	maxFeeHistory := a.b.config.FeeHistoryMaxBlockCount
 	if blocks > maxFeeHistory {
@@ -260,7 +291,7 @@ func (a *APIBackend) FeeHistory(
 			currentTimestampGasUsed = 0
 		}
 
-		receipts := a.blockChain().GetReceiptsByHash(header.ReceiptHash)
+		receipts := a.BlockChain().GetReceiptsByHash(header.Hash())
 		for _, receipt := range receipts {
 			if receipt.GasUsed > receipt.GasUsedForL1 {
 				currentTimestampGasUsed += receipt.GasUsed - receipt.GasUsedForL1
@@ -292,7 +323,7 @@ func (a *APIBackend) FeeHistory(
 }
 
 func (a *APIBackend) ChainDb() ethdb.Database {
-	return a.b.chainDb
+	return a.dbForAPICalls
 }
 
 func (a *APIBackend) AccountManager() *accounts.Manager {
@@ -329,17 +360,23 @@ func (a *APIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber)
 }
 
 func (a *APIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	return a.blockChain().GetHeaderByHash(hash), nil
+	return a.BlockChain().GetHeaderByHash(hash), nil
 }
 
 func (a *APIBackend) blockNumberToUint(ctx context.Context, number rpc.BlockNumber) (uint64, error) {
 	if number == rpc.LatestBlockNumber || number == rpc.PendingBlockNumber {
-		return a.blockChain().CurrentBlock().Number.Uint64(), nil
+		return a.BlockChain().CurrentBlock().Number.Uint64(), nil
 	}
 	if number == rpc.SafeBlockNumber {
+		if a.sync == nil {
+			return 0, errors.New("block number not supported: object not set")
+		}
 		return a.sync.SafeBlockNumber(ctx)
 	}
 	if number == rpc.FinalizedBlockNumber {
+		if a.sync == nil {
+			return 0, errors.New("block number not supported: object not set")
+		}
 		return a.sync.FinalizedBlockNumber(ctx)
 	}
 	if number < 0 {
@@ -350,13 +387,13 @@ func (a *APIBackend) blockNumberToUint(ctx context.Context, number rpc.BlockNumb
 
 func (a *APIBackend) headerByNumberImpl(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
 	if number == rpc.LatestBlockNumber || number == rpc.PendingBlockNumber {
-		return a.blockChain().CurrentBlock(), nil
+		return a.BlockChain().CurrentBlock(), nil
 	}
 	numUint, err := a.blockNumberToUint(ctx, number)
 	if err != nil {
 		return nil, err
 	}
-	return a.blockChain().GetHeaderByNumber(numUint), nil
+	return a.BlockChain().GetHeaderByNumber(numUint), nil
 }
 
 func (a *APIBackend) headerByNumberOrHashImpl(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error) {
@@ -366,7 +403,7 @@ func (a *APIBackend) headerByNumberOrHashImpl(ctx context.Context, blockNrOrHash
 	}
 	hash, ishash := blockNrOrHash.Hash()
 	if ishash {
-		return a.blockChain().GetHeaderByHash(hash), nil
+		return a.BlockChain().GetHeaderByHash(hash), nil
 	}
 	return nil, errors.New("invalid arguments; neither block nor hash specified")
 }
@@ -376,17 +413,17 @@ func (a *APIBackend) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc
 }
 
 func (a *APIBackend) CurrentHeader() *types.Header {
-	return a.blockChain().CurrentHeader()
+	return a.BlockChain().CurrentHeader()
 }
 
 func (a *APIBackend) CurrentBlock() *types.Header {
-	return a.blockChain().CurrentBlock()
+	return a.BlockChain().CurrentBlock()
 }
 
 func (a *APIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
 	if number == rpc.LatestBlockNumber || number == rpc.PendingBlockNumber {
-		currentHeader := a.blockChain().CurrentBlock()
-		currentBlock := a.blockChain().GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64())
+		currentHeader := a.BlockChain().CurrentBlock()
+		currentBlock := a.BlockChain().GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64())
 		if currentBlock == nil {
 			return nil, errors.New("can't find block for current header")
 		}
@@ -396,11 +433,11 @@ func (a *APIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) 
 	if err != nil {
 		return nil, err
 	}
-	return a.blockChain().GetBlockByNumber(numUint), nil
+	return a.BlockChain().GetBlockByNumber(numUint), nil
 }
 
 func (a *APIBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	return a.blockChain().GetBlockByHash(hash), nil
+	return a.BlockChain().GetBlockByHash(hash), nil
 }
 
 func (a *APIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
@@ -415,54 +452,113 @@ func (a *APIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.
 	return nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
-func (a *APIBackend) stateAndHeaderFromHeader(ctx context.Context, header *types.Header, err error) (*state.StateDB, *types.Header, error) {
+func StateAndHeaderFromHeader(ctx context.Context, chainDb ethdb.Database, bc *core.BlockChain, maxRecreateStateDepth int64, header *types.Header, err error) (*state.StateDB, *types.Header, error) {
 	if err != nil {
 		return nil, header, err
 	}
 	if header == nil {
 		return nil, nil, errors.New("header not found")
 	}
-	if !a.blockChain().Config().IsArbitrumNitro(header.Number) {
+	if !bc.Config().IsArbitrumNitro(header.Number) {
 		return nil, header, types.ErrUseFallback
 	}
-	bc := a.blockChain()
-	stateFor := func(header *types.Header) (*state.StateDB, error) {
-		return bc.StateAt(header.Root)
+	stateFor := func(db state.Database, snapshots *snapshot.Tree) func(header *types.Header) (*state.StateDB, StateReleaseFunc, error) {
+		return func(header *types.Header) (*state.StateDB, StateReleaseFunc, error) {
+			if header.Root != (common.Hash{}) {
+				// Try referencing the root, if it isn't in dirties cache then Reference will have no effect
+				db.TrieDB().Reference(header.Root, common.Hash{})
+			}
+			statedb, err := state.New(header.Root, db, snapshots)
+			if err != nil {
+				return nil, nil, err
+			}
+			if header.Root != (common.Hash{}) {
+				headerRoot := header.Root
+				return statedb, func() { db.TrieDB().Dereference(headerRoot) }, nil
+			}
+			return statedb, NoopStateRelease, nil
+		}
 	}
-	state, lastHeader, err := FindLastAvailableState(ctx, bc, stateFor, header, nil, a.b.config.MaxRecreateStateDepth)
+	liveState, liveStateRelease, err := stateFor(bc.StateCache(), bc.Snapshots())(header)
+	if err == nil {
+		liveStatesReferencedCounter.Inc(1)
+		liveState.SetArbFinalizer(func(*state.ArbitrumExtraData) {
+			liveStateRelease()
+			liveStatesDereferencedCounter.Inc(1)
+		})
+		return liveState, header, nil
+	}
+	// else err != nil => we don't need to call liveStateRelease
+
+	// Create an ephemeral trie.Database for isolating the live one
+	// note: triedb cleans cache is disabled in trie.HashDefaults
+	// note: only states committed to diskdb can be found as we're creating new triedb
+	// note: snapshots are not used here
+	ephemeral := state.NewDatabaseWithConfig(chainDb, trie.HashDefaults)
+	lastState, lastHeader, lastStateRelease, err := FindLastAvailableState(ctx, bc, stateFor(ephemeral, nil), header, nil, maxRecreateStateDepth)
 	if err != nil {
 		return nil, nil, err
 	}
+	// make sure that we haven't found the state in diskdb
 	if lastHeader == header {
-		return state, header, nil
+		liveStatesReferencedCounter.Inc(1)
+		lastState.SetArbFinalizer(func(*state.ArbitrumExtraData) {
+			lastStateRelease()
+			liveStatesDereferencedCounter.Inc(1)
+		})
+		return lastState, header, nil
 	}
-	state, err = AdvanceStateUpToBlock(ctx, bc, state, header, lastHeader, nil)
+	defer lastStateRelease()
+	targetBlock := bc.GetBlockByNumber(header.Number.Uint64())
+	if targetBlock == nil {
+		return nil, nil, errors.New("target block not found")
+	}
+	lastBlock := bc.GetBlockByNumber(lastHeader.Number.Uint64())
+	if lastBlock == nil {
+		return nil, nil, errors.New("last block not found")
+	}
+	reexec := uint64(0)
+	checkLive := false
+	preferDisk := false // preferDisk is ignored in this case
+	statedb, release, err := eth.NewArbEthereum(bc, chainDb).StateAtBlock(ctx, targetBlock, reexec, lastState, lastBlock, checkLive, preferDisk)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to recreate state: %w", err)
 	}
-	return state, header, err
+	// we are setting finalizer instead of returning a StateReleaseFunc to avoid changing ethapi.Backend interface to minimize diff to upstream
+	recreatedStatesReferencedCounter.Inc(1)
+	statedb.SetArbFinalizer(func(*state.ArbitrumExtraData) {
+		release()
+		recreatedStatesDereferencedCounter.Inc(1)
+	})
+	return statedb, header, err
 }
 
 func (a *APIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	header, err := a.HeaderByNumber(ctx, number)
-	return a.stateAndHeaderFromHeader(ctx, header, err)
+	return StateAndHeaderFromHeader(ctx, a.ChainDb(), a.b.arb.BlockChain(), a.b.config.MaxRecreateStateDepth, header, err)
 }
 
 func (a *APIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
 	header, err := a.HeaderByNumberOrHash(ctx, blockNrOrHash)
-	return a.stateAndHeaderFromHeader(ctx, header, err)
+	hash, ishash := blockNrOrHash.Hash()
+	bc := a.BlockChain()
+	// check if we are not trying to get recent state that is not yet triedb referenced or committed in Blockchain.writeBlockWithState
+	if ishash && header != nil && header.Number.Cmp(bc.CurrentBlock().Number) > 0 && bc.GetCanonicalHash(header.Number.Uint64()) != hash {
+		return nil, nil, errors.New("requested block ahead of current block and the hash is not currently canonical")
+	}
+	return StateAndHeaderFromHeader(ctx, a.ChainDb(), a.b.arb.BlockChain(), a.b.config.MaxRecreateStateDepth, header, err)
 }
 
 func (a *APIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error) {
-	if !a.blockChain().Config().IsArbitrumNitro(block.Number()) {
+	if !a.BlockChain().Config().IsArbitrumNitro(block.Number()) {
 		return nil, nil, types.ErrUseFallback
 	}
 	// DEV: This assumes that `StateAtBlock` only accesses the blockchain and chainDb fields
-	return eth.NewArbEthereum(a.b.arb.BlockChain(), a.ChainDb()).StateAtBlock(ctx, block, reexec, base, checkLive, preferDisk)
+	return eth.NewArbEthereum(a.b.arb.BlockChain(), a.ChainDb()).StateAtBlock(ctx, block, reexec, base, nil, checkLive, preferDisk)
 }
 
 func (a *APIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
-	if !a.blockChain().Config().IsArbitrumNitro(block.Number()) {
+	if !a.BlockChain().Config().IsArbitrumNitro(block.Number()) {
 		return nil, vm.BlockContext{}, nil, nil, types.ErrUseFallback
 	}
 	// DEV: This assumes that `StateAtTransaction` only accesses the blockchain and chainDb fields
@@ -470,35 +566,40 @@ func (a *APIBackend) StateAtTransaction(ctx context.Context, block *types.Block,
 }
 
 func (a *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	return a.blockChain().GetReceiptsByHash(hash), nil
+	return a.BlockChain().GetReceiptsByHash(hash), nil
 }
 
 func (a *APIBackend) GetTd(ctx context.Context, hash common.Hash) *big.Int {
-	if header := a.blockChain().GetHeaderByHash(hash); header != nil {
-		return a.blockChain().GetTd(hash, header.Number.Uint64())
+	if header := a.BlockChain().GetHeaderByHash(hash); header != nil {
+		return a.BlockChain().GetTd(hash, header.Number.Uint64())
 	}
 	return nil
 }
 
-func (a *APIBackend) GetEVM(ctx context.Context, msg *core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config, blockCtx *vm.BlockContext) (*vm.EVM, func() error) {
-	vmError := func() error { return nil }
+func (a *APIBackend) GetEVM(ctx context.Context, msg *core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config, blockCtx *vm.BlockContext) *vm.EVM {
 	if vmConfig == nil {
-		vmConfig = a.blockChain().GetVMConfig()
+		vmConfig = a.BlockChain().GetVMConfig()
 	}
 	txContext := core.NewEVMTxContext(msg)
-	return vm.NewEVM(*blockCtx, txContext, state, a.blockChain().Config(), *vmConfig), vmError
+	var context vm.BlockContext
+	if blockCtx != nil {
+		context = *blockCtx
+	} else {
+		context = core.NewEVMBlockContext(header, a.BlockChain(), nil)
+	}
+	return vm.NewEVM(context, txContext, state, a.BlockChain().Config(), *vmConfig)
 }
 
 func (a *APIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return a.blockChain().SubscribeChainEvent(ch)
+	return a.BlockChain().SubscribeChainEvent(ch)
 }
 
 func (a *APIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return a.blockChain().SubscribeChainHeadEvent(ch)
+	return a.BlockChain().SubscribeChainHeadEvent(ch)
 }
 
 func (a *APIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return a.blockChain().SubscribeChainSideEvent(ch)
+	return a.BlockChain().SubscribeChainSideEvent(ch)
 }
 
 // Transaction pool API
@@ -510,9 +611,9 @@ func (a *APIBackend) SendConditionalTx(ctx context.Context, signedTx *types.Tran
 	return a.b.EnqueueL2Message(ctx, signedTx, options)
 }
 
-func (a *APIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
+func (a *APIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (bool, *types.Transaction, common.Hash, uint64, uint64, error) {
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(a.b.chainDb, txHash)
-	return tx, blockHash, blockNumber, index, nil
+	return tx != nil, tx, blockHash, blockNumber, index, nil
 }
 
 func (a *APIBackend) GetPoolTransactions() (types.Transactions, error) {
@@ -526,7 +627,7 @@ func (a *APIBackend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
 }
 
 func (a *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
-	stateDB, err := a.blockChain().State()
+	stateDB, err := a.BlockChain().State()
 	if err != nil {
 		return 0, err
 	}
@@ -537,11 +638,11 @@ func (a *APIBackend) Stats() (pending int, queued int) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (a *APIBackend) TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+func (a *APIBackend) TxPoolContent() (map[common.Address][]*types.Transaction, map[common.Address][]*types.Transaction) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (a *APIBackend) TxPoolContentFrom(addr common.Address) (types.Transactions, types.Transactions) {
+func (a *APIBackend) TxPoolContentFrom(addr common.Address) ([]*types.Transaction, []*types.Transaction) {
 	panic("not implemented") // TODO: Implement
 }
 
@@ -556,7 +657,7 @@ func (a *APIBackend) BloomStatus() (uint64, uint64) {
 }
 
 func (a *APIBackend) GetLogs(ctx context.Context, hash common.Hash, number uint64) ([][]*types.Log, error) {
-	return rawdb.ReadLogs(a.ChainDb(), hash, number, a.ChainConfig()), nil
+	return rawdb.ReadLogs(a.ChainDb(), hash, number), nil
 }
 
 func (a *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
@@ -566,7 +667,7 @@ func (a *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.Match
 }
 
 func (a *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return a.blockChain().SubscribeLogsEvent(ch)
+	return a.BlockChain().SubscribeLogsEvent(ch)
 }
 
 func (a *APIBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription {
@@ -575,15 +676,15 @@ func (a *APIBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Sub
 }
 
 func (a *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return a.blockChain().SubscribeRemovedLogsEvent(ch)
+	return a.BlockChain().SubscribeRemovedLogsEvent(ch)
 }
 
 func (a *APIBackend) ChainConfig() *params.ChainConfig {
-	return a.blockChain().Config()
+	return a.BlockChain().Config()
 }
 
 func (a *APIBackend) Engine() consensus.Engine {
-	return a.blockChain().Engine()
+	return a.b.Engine()
 }
 
 func (b *APIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {

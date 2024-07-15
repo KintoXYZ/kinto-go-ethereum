@@ -39,6 +39,10 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return true, nil
 }
 
+func (t *Database) WasmDataBase() (ethdb.KeyValueStore, uint32) {
+	return t, 0
+}
+
 func (db *Database) Get(key []byte) ([]byte, error) {
 	var resp hexutil.Bytes
 	err := db.remote.Call(&resp, "debug_dbGet", hexutil.Bytes(key))
@@ -98,11 +102,11 @@ func (db *Database) ModifyAncients(f func(ethdb.AncientWriteOp) error) (int64, e
 	panic("not supported")
 }
 
-func (db *Database) TruncateHead(n uint64) error {
+func (db *Database) TruncateHead(n uint64) (uint64, error) {
 	panic("not supported")
 }
 
-func (db *Database) TruncateTail(n uint64) error {
+func (db *Database) TruncateTail(n uint64) (uint64, error) {
 	panic("not supported")
 }
 

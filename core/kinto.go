@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/hex"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -38,17 +37,17 @@ var (
 // Kinto addresses devnet
 /*
 var (
-	aaEntryPointEnvAddress      = common.HexToAddress("0x302b00A0b9C865F89099d27F7538CEe33E9A4f92")
-	kintoIdEnvAddress           = common.HexToAddress("0xCa41d9C3f13a8096356E6fddf0a29C51A938c410")
-	walletFactoryAddress        = common.HexToAddress("0xB8818F4c0CE119AC274f217e9C11506DCf1bBb70")
-	paymasterAddress            = common.HexToAddress("0x8dc62b6FAF2929a58a1fca99aCF394ddf0CfAD16")
-	appRegistryAddress          = common.HexToAddress("0xfA2EBDCcFD06733D8D78fB870450BB7512453286")
+	aaEntryPointEnvAddress      = common.HexToAddress("0x7f32b31580B76B828642fea9Dc4EAe5BDdE2AC25")
+	kintoIdEnvAddress           = common.HexToAddress("0x10B33fd6df97B2F0d19079710Eac6bCEC226513f")
+	walletFactoryAddress        = common.HexToAddress("0xA9753F0270791E4a6469C879b5e76876Ae619B0c")
+	paymasterAddress            = common.HexToAddress("0x5005DCB342D98CA7Cb7cb8fd770237998884543A")
+	appRegistryAddress          = common.HexToAddress("0x9C92003A97Cb4B51fC10ECb6Ed0E448F726BE75D")
 	upgradeExecutor             = common.HexToAddress("0x6B0d3F40DeD9720938DB274f752F1e11532c2640")
 	customGatewayAddress        = common.HexToAddress("0x094F8C3eA1b5671dd19E15eCD93C80d2A33fCA99")
 	gatewayRouterAddress        = common.HexToAddress("0xf3AC740Fcc64eEd76dFaE663807749189A332d54")
 	standardGatewayAddress      = common.HexToAddress("0x6A8d32c495df943212B7788114e41103047150a5")
 	wethGateWayAddress          = common.HexToAddress("0x79B47F0695608aD8dc90E400a3E123b02eB72D24")
-	bundleBulker                = common.HexToAddress("0x5E98b98B15dF001f5cBDdfeB05E9A2828A6A02Cd")
+	bundleBulker                = common.HexToAddress("0x2291d967F4f8E7B062D0eAA977C5adBbd33B99BB")
 	arbRetrayableTx             = common.HexToAddress("0x000000000000000000000000000000000000006E")
 	socket                      = common.HexToAddress("0x62B421B7dbc6207CC010318a4ba567786137de29")
 	socketExecutionManager      = common.HexToAddress("0x4518D09052D6f40f83d489a3E9F81EF369dB0753")
@@ -63,7 +62,6 @@ var (
 	create2Factory              = common.HexToAddress("0x4e59b44847b379578588920cA78FbF26c0B4956C")
 )
 */
-
 // Kinto-specific constants for function selectors
 const (
 	functionSelectorEPWithdrawTo          = "205c2878"
@@ -84,7 +82,14 @@ const (
 )
 
 // enforceKinto decides which set of Kinto rules to apply based on the current block number
-func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
+func enforceKinto(msg *Message, st *StateTransition) error {
+	var currentBlockNumber = st.evm.Context.BlockNumber
+
+	//Hardfork5 bytecode replacement (happens once)
+	if currentBlockNumber.Cmp(common.KintoHardfork5) == 0 {
+		st.state.SetCode(replaceHF5Address, replacedHF5Bytecode)
+	}
+
 	if msg.TxRunMode == MessageEthcallMode {
 		return nil // Allow all calls
 	}
@@ -98,10 +103,13 @@ func enforceKinto(msg *Message, currentBlockNumber *big.Int) error {
 			return enforceHardForkTwoRules(msg) // Rules for the second hard fork
 		} else if currentBlockNumber.Cmp(common.KintoHardfork4) <= 0 {
 			return enforceHardForkThreeRules(msg) //Rules for the third hard fork
-		} else {
+		} else if currentBlockNumber.Cmp(common.KintoHardfork5) <= 0 {
 			return enforceHardForkFourRules(msg) //Rules for the fourth hard fork
+		} else {
+			return enforceHardForkFiveRules(msg) //Rules for the fifth hard fork
 		}
 	}
+
 	return nil
 }
 
