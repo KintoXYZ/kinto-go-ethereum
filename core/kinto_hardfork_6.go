@@ -134,6 +134,8 @@ func isContractCallAllowedFromEOA(st *StateTransition, from, to common.Address) 
 	if err != nil {
 		return false, fmt.Errorf("error unpacking result: %v", err)
 	}
+	//log result
+	fmt.Printf("****Result: %v\n", result)
 
 	return result, nil
 }
