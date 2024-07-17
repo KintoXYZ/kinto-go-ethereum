@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -96,8 +97,11 @@ func enforceKinto(msg *Message, st *StateTransition) error {
 
 	//Hardfork6 bytecode replacement (happens once)
 	if currentBlockNumber.Cmp(common.KintoHardfork6) == 0 {
+		fmt.Print("**** Hardfork 6 bytecode replacement entrypoint\n")
 		st.state.SetCode(aaEntryPointEnvAddressV7, entryPointV7Bytecode)
+		fmt.Print("**** Hardfork 6 bytecode replacement create2\n")
 		st.state.SetCode(create2Factory, vanillaCreate2FactoryBytecode)
+		fmt.Print("**** Done!!\n")
 	}
 
 	if msg.TxRunMode == MessageEthcallMode {
