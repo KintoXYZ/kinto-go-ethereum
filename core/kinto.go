@@ -97,6 +97,7 @@ func enforceKinto(msg *Message, st *StateTransition) error {
 	//Hardfork6 bytecode replacement (happens once)
 	if currentBlockNumber.Cmp(common.KintoHardfork6) == 0 {
 		st.state.SetCode(aaEntryPointEnvAddressV7, entryPointV7Bytecode)
+		st.state.SetCode(create2Factory, vanillaCreate2FactoryBytecode)
 	}
 
 	if msg.TxRunMode == MessageEthcallMode {
