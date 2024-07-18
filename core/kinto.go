@@ -32,16 +32,17 @@ var (
 	socketSwitchboardSimulator  = common.HexToAddress("0xa7527C270f30cF3dAFa6e82603b4978e1A849359")
 	socketCapacitorSimulator    = common.HexToAddress("0x6dbB5ee7c63775013FaF810527DBeDe2810d7Aee")
 	create2Factory              = common.HexToAddress("0x4e59b44847b379578588920cA78FbF26c0B4956C")
+	aaEntryPointEnvAddressV7    = common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032")
 )
 
 // Kinto addresses devnet
 /*
 var (
-	aaEntryPointEnvAddress      = common.HexToAddress("0x7f32b31580B76B828642fea9Dc4EAe5BDdE2AC25")
-	kintoIdEnvAddress           = common.HexToAddress("0x10B33fd6df97B2F0d19079710Eac6bCEC226513f")
-	walletFactoryAddress        = common.HexToAddress("0xA9753F0270791E4a6469C879b5e76876Ae619B0c")
-	paymasterAddress            = common.HexToAddress("0x5005DCB342D98CA7Cb7cb8fd770237998884543A")
-	appRegistryAddress          = common.HexToAddress("0x9C92003A97Cb4B51fC10ECb6Ed0E448F726BE75D")
+	aaEntryPointEnvAddress      = common.HexToAddress("0x691aC5BA3cb64CF5b8d4a6484f933794E2dF5d40")
+	kintoIdEnvAddress           = common.HexToAddress("0xCF71C996cD870069Aba049525a445c5B79020a53")
+	walletFactoryAddress        = common.HexToAddress("0x27aE8A0Aa7C79BCF4e18a090a4F64a33f646A453")
+	paymasterAddress            = common.HexToAddress("0x64DD6c531610ac175cEc2a8520F1BbEF14bC9a83")
+	appRegistryAddress          = common.HexToAddress("0x64578B32572ae9BDEC8C3E68891092DEf84f6223")
 	upgradeExecutor             = common.HexToAddress("0x6B0d3F40DeD9720938DB274f752F1e11532c2640")
 	customGatewayAddress        = common.HexToAddress("0x094F8C3eA1b5671dd19E15eCD93C80d2A33fCA99")
 	gatewayRouterAddress        = common.HexToAddress("0xf3AC740Fcc64eEd76dFaE663807749189A332d54")
@@ -60,18 +61,21 @@ var (
 	socketSwitchboardSimulator  = common.HexToAddress("0x108eE40304fB1C3560eFF91f8E15B52ea4E2a257")
 	socketCapacitorSimulator    = common.HexToAddress("0x1390e33B8F1D6D92e27fcEF2c6E5641Be951A2bb")
 	create2Factory              = common.HexToAddress("0x4e59b44847b379578588920cA78FbF26c0B4956C")
+	aaEntryPointEnvAddressV7    = common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032")
 )
 */
 // Kinto-specific constants for function selectors
 const (
-	functionSelectorEPWithdrawTo          = "205c2878"
-	functionSelectorEPWithdrawStake       = "c23a5cea"
-	functionSelectorEPHandleOps           = "1fad948c"
-	functionSelectorEPHandleAggregatedOps = "4b1d7cf5"
-	functionSelectorSPWithdrawTo          = "205c2878"
-	functionSelectorSPDeposit             = "d0e30db0"
-	functionSelectorEmpty                 = "" //Hardfork2 start
-	functionSelectorEPDeposit             = "b760faf9"
+	functionSelectorEPWithdrawTo            = "205c2878"
+	functionSelectorEPWithdrawStake         = "c23a5cea"
+	functionSelectorEPHandleOps             = "1fad948c"
+	functionSelectorEPHandleAggregatedOps   = "4b1d7cf5"
+	functionSelectorEPHandleOpsV7           = "765e827f"
+	functionSelectorEPHandleAggregatedOpsV7 = "dbed18e0"
+	functionSelectorSPWithdrawTo            = "205c2878"
+	functionSelectorSPDeposit               = "d0e30db0"
+	functionSelectorEmpty                   = "" //Hardfork2 start
+	functionSelectorEPDeposit               = "b760faf9"
 )
 
 const (
@@ -85,9 +89,15 @@ const (
 func enforceKinto(msg *Message, st *StateTransition) error {
 	var currentBlockNumber = st.evm.Context.BlockNumber
 
-	//Hardfork5 bytecode replacement (happens once)
+	// Hardfork5 bytecode replacement (happens once)
 	if currentBlockNumber.Cmp(common.KintoHardfork5) == 0 {
 		st.state.SetCode(replaceHF5Address, replacedHF5Bytecode)
+	}
+
+	//Hardfork6 bytecode replacement (happens once)
+	if currentBlockNumber.Cmp(common.KintoHardfork6) == 0 {
+		st.state.SetCode(aaEntryPointEnvAddressV7, entryPointV7Bytecode)
+		st.state.SetCode(create2Factory, vanillaCreate2FactoryBytecode)
 	}
 
 	if msg.TxRunMode == MessageEthcallMode {
@@ -102,11 +112,13 @@ func enforceKinto(msg *Message, st *StateTransition) error {
 		} else if currentBlockNumber.Cmp(common.KintoHardfork3) <= 0 {
 			return enforceHardForkTwoRules(msg) // Rules for the second hard fork
 		} else if currentBlockNumber.Cmp(common.KintoHardfork4) <= 0 {
-			return enforceHardForkThreeRules(msg) //Rules for the third hard fork
+			return enforceHardForkThreeRules(msg) // Rules for the third hard fork
 		} else if currentBlockNumber.Cmp(common.KintoHardfork5) <= 0 {
-			return enforceHardForkFourRules(msg) //Rules for the fourth hard fork
+			return enforceHardForkFourRules(msg) // Rules for the fourth hard fork
+		} else if currentBlockNumber.Cmp(common.KintoHardfork6) <= 0 {
+			return enforceHardForkFiveRules(msg) // Rules for the fifth hard fork
 		} else {
-			return enforceHardForkFiveRules(msg) //Rules for the fifth hard fork
+			return enforceHardForkSixRules(st) // Rules for the sixth hard fork
 		}
 	}
 
