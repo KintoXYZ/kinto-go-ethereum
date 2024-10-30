@@ -36,13 +36,13 @@ var (
 )
 
 // Kinto addresses devnet
-/*
-var (
-	aaEntryPointEnvAddress      = common.HexToAddress("0x691aC5BA3cb64CF5b8d4a6484f933794E2dF5d40")
-	kintoIdEnvAddress           = common.HexToAddress("0xCF71C996cD870069Aba049525a445c5B79020a53")
-	walletFactoryAddress        = common.HexToAddress("0x27aE8A0Aa7C79BCF4e18a090a4F64a33f646A453")
-	paymasterAddress            = common.HexToAddress("0x64DD6c531610ac175cEc2a8520F1BbEF14bC9a83")
-	appRegistryAddress          = common.HexToAddress("0x64578B32572ae9BDEC8C3E68891092DEf84f6223")
+
+/*var (
+	aaEntryPointEnvAddress      = common.HexToAddress("0x3Ac318F6E5479606d95659EDE2A01c92A8dd8c42")
+	kintoIdEnvAddress           = common.HexToAddress("0x951499DDb7af748186CEa5bE861F355998E2e527")
+	walletFactoryAddress        = common.HexToAddress("0x9905f57926c0E679Eb3a2974b7B18F0C97b79d2c")
+	paymasterAddress            = common.HexToAddress("0x9CC6A053764c30eB8eA9c9cac0d714F476a39F8c")
+	appRegistryAddress          = common.HexToAddress("0x6E1B1A6220eFc0671A6362cA3B5BB7BCE60dC12B")
 	upgradeExecutor             = common.HexToAddress("0x6B0d3F40DeD9720938DB274f752F1e11532c2640")
 	customGatewayAddress        = common.HexToAddress("0x094F8C3eA1b5671dd19E15eCD93C80d2A33fCA99")
 	gatewayRouterAddress        = common.HexToAddress("0xf3AC740Fcc64eEd76dFaE663807749189A332d54")
@@ -62,8 +62,8 @@ var (
 	socketCapacitorSimulator    = common.HexToAddress("0x1390e33B8F1D6D92e27fcEF2c6E5641Be951A2bb")
 	create2Factory              = common.HexToAddress("0x4e59b44847b379578588920cA78FbF26c0B4956C")
 	aaEntryPointEnvAddressV7    = common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032")
-)
-*/
+)*/
+
 // Kinto-specific constants for function selectors
 const (
 	functionSelectorEPWithdrawTo            = "205c2878"
@@ -100,6 +100,11 @@ func enforceKinto(msg *Message, st *StateTransition) error {
 		st.state.SetCode(create2Factory, vanillaCreate2FactoryBytecode)
 	}
 
+	//Hardfork7 bytecode replacement (happens once)
+	if currentBlockNumber.Cmp(common.KintoHardfork7) == 0 {
+		st.state.SetCode(aaEntryPointEnvAddressV7, entryPointV7OriginalBytecode)
+	}
+
 	if msg.TxRunMode == MessageEthcallMode {
 		return nil // Allow all calls
 	}
@@ -117,8 +122,10 @@ func enforceKinto(msg *Message, st *StateTransition) error {
 			return enforceHardForkFourRules(msg) // Rules for the fourth hard fork
 		} else if currentBlockNumber.Cmp(common.KintoHardfork6) <= 0 {
 			return enforceHardForkFiveRules(msg) // Rules for the fifth hard fork
-		} else {
+		} else if currentBlockNumber.Cmp(common.KintoHardfork7) <= 0 {
 			return enforceHardForkSixRules(st) // Rules for the sixth hard fork
+		} else {
+			return enforceHardForkSevenRules(st) // Rules for the seventh hard fork
 		}
 	}
 

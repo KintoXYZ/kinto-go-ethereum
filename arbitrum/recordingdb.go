@@ -19,9 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/trie/triedb/hashdb"
-	flag "github.com/spf13/pflag"
+	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/ethereum/go-ethereum/triedb/hashdb"
 )
 
 var (
@@ -30,13 +29,13 @@ var (
 )
 
 type RecordingKV struct {
-	inner         *trie.Database
+	inner         *triedb.Database
 	diskDb        ethdb.KeyValueStore
 	readDbEntries map[common.Hash][]byte
 	enableBypass  bool
 }
 
-func newRecordingKV(inner *trie.Database, diskDb ethdb.KeyValueStore) *RecordingKV {
+func newRecordingKV(inner *triedb.Database, diskDb ethdb.KeyValueStore) *RecordingKV {
 	return &RecordingKV{inner, diskDb, make(map[common.Hash][]byte), false}
 }
 
@@ -159,18 +158,8 @@ func (r *RecordingChainContext) GetMinBlockNumberAccessed() uint64 {
 }
 
 type RecordingDatabaseConfig struct {
-	TrieDirtyCache int `koanf:"trie-dirty-cache"`
-	TrieCleanCache int `koanf:"trie-clean-cache"`
-}
-
-var DefaultRecordingDatabaseConfig = RecordingDatabaseConfig{
-	TrieDirtyCache: 1024,
-	TrieCleanCache: 16,
-}
-
-func RecordingDatabaseConfigAddOptions(prefix string, f *flag.FlagSet) {
-	f.Int(prefix+".trie-dirty-cache", DefaultRecordingDatabaseConfig.TrieDirtyCache, "like trie-dirty-cache for the separate, recording database (used for validation)")
-	f.Int(prefix+".trie-clean-cache", DefaultRecordingDatabaseConfig.TrieCleanCache, "like trie-clean-cache for the separate, recording database (used for validation)")
+	TrieDirtyCache int
+	TrieCleanCache int
 }
 
 type RecordingDatabase struct {
@@ -184,7 +173,7 @@ type RecordingDatabase struct {
 func NewRecordingDatabase(config *RecordingDatabaseConfig, ethdb ethdb.Database, blockchain *core.BlockChain) *RecordingDatabase {
 	hashConfig := *hashdb.Defaults
 	hashConfig.CleanCacheSize = config.TrieCleanCache
-	trieConfig := trie.Config{
+	trieConfig := triedb.Config{
 		Preimages: false,
 		HashDB:    &hashConfig,
 	}
@@ -269,7 +258,7 @@ func (r *RecordingDatabase) PrepareRecording(ctx context.Context, lastBlockHeade
 	defer func() { r.Dereference(finalDereference) }()
 	recordingKeyValue := newRecordingKV(r.db.TrieDB(), r.db.DiskDB())
 
-	recordingStateDatabase := state.NewDatabase(rawdb.WrapDatabaseWithWasm(rawdb.NewDatabase(recordingKeyValue), r.db.WasmStore(), 0))
+	recordingStateDatabase := state.NewDatabase(rawdb.WrapDatabaseWithWasm(rawdb.NewDatabase(recordingKeyValue), r.db.WasmStore(), 0, r.db.WasmTargets()))
 	var prevRoot common.Hash
 	if lastBlockHeader != nil {
 		prevRoot = lastBlockHeader.Root

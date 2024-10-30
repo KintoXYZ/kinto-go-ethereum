@@ -26,13 +26,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/triedb"
 )
 
 // diskLayer is a low level persistent snapshot built on top of a key-value store.
 type diskLayer struct {
 	diskdb ethdb.KeyValueStore // Key-value store containing the base snapshot
-	triedb *trie.Database      // Trie node cache for reconstruction purposes
+	triedb *triedb.Database    // Trie node cache for reconstruction purposes
 	cache  *fastcache.Cache    // Cache to avoid hitting the disk for direct access
 
 	root  common.Hash // Root hash of the base snapshot
@@ -117,7 +117,10 @@ func (dl *diskLayer) AccountRLP(hash common.Hash) ([]byte, error) {
 		return blob, nil
 	}
 	// Cache doesn't contain account, pull from disk and cache for later
-	blob := rawdb.ReadAccountSnapshot(dl.diskdb, hash)
+	blob, err := rawdb.ReadAccountSnapshot(dl.diskdb, hash)
+	if err != nil {
+		return nil, err
+	}
 	dl.cache.Set(hash[:], blob)
 
 	snapshotCleanAccountMissMeter.Mark(1)
@@ -157,7 +160,10 @@ func (dl *diskLayer) Storage(accountHash, storageHash common.Hash) ([]byte, erro
 		return blob, nil
 	}
 	// Cache doesn't contain storage slot, pull from disk and cache for later
-	blob := rawdb.ReadStorageSnapshot(dl.diskdb, accountHash, storageHash)
+	blob, err := rawdb.ReadStorageSnapshot(dl.diskdb, accountHash, storageHash)
+	if err != nil {
+		return nil, err
+	}
 	dl.cache.Set(key, blob)
 
 	snapshotCleanStorageMissMeter.Mark(1)

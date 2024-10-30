@@ -29,9 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/trie/triedb/hashdb"
-	"github.com/ethereum/go-ethereum/trie/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/trie/trienode"
+	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/ethereum/go-ethereum/triedb/hashdb"
+	"github.com/ethereum/go-ethereum/triedb/pathdb"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -155,20 +156,20 @@ func checkSnapRoot(t *testing.T, snap *diskLayer, trieRoot common.Hash) {
 
 type testHelper struct {
 	diskdb  ethdb.Database
-	triedb  *trie.Database
+	triedb  *triedb.Database
 	accTrie *trie.StateTrie
 	nodes   *trienode.MergedNodeSet
 }
 
 func newHelper(scheme string) *testHelper {
 	diskdb := rawdb.NewMemoryDatabase()
-	config := &trie.Config{}
+	config := &triedb.Config{}
 	if scheme == rawdb.PathScheme {
 		config.PathDB = &pathdb.Config{} // disable caching
 	} else {
 		config.HashDB = &hashdb.Config{} // disable caching
 	}
-	triedb := trie.NewDatabase(diskdb, config)
+	triedb := triedb.NewDatabase(diskdb, config)
 	accTrie, _ := trie.NewStateTrie(trie.StateTrieID(types.EmptyRootHash), triedb)
 	return &testHelper{
 		diskdb:  diskdb,
@@ -577,7 +578,7 @@ func testGenerateWithExtraAccounts(t *testing.T, scheme string) {
 	root := helper.Commit()
 
 	// To verify the test: If we now inspect the snap db, there should exist extraneous storage items
-	if data := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data == nil {
+	if data, _ := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data == nil {
 		t.Fatalf("expected snap storage to exist")
 	}
 	snap := generateSnapshot(helper.diskdb, helper.triedb, 16, root)
@@ -595,7 +596,7 @@ func testGenerateWithExtraAccounts(t *testing.T, scheme string) {
 	snap.genAbort <- stop
 	<-stop
 	// If we now inspect the snap db, there should exist no extraneous storage items
-	if data := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data != nil {
+	if data, _ := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data != nil {
 		t.Fatalf("expected slot to be removed, got %v", string(data))
 	}
 }
@@ -745,7 +746,7 @@ func testGenerateWithMalformedSnapdata(t *testing.T, scheme string) {
 	snap.genAbort <- stop
 	<-stop
 	// If we now inspect the snap db, there should exist no extraneous storage items
-	if data := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data != nil {
+	if data, _ := rawdb.ReadStorageSnapshot(helper.diskdb, hashData([]byte("acc-2")), hashData([]byte("b-key-1"))); data != nil {
 		t.Fatalf("expected slot to be removed, got %v", string(data))
 	}
 }
